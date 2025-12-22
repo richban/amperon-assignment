@@ -6,7 +6,12 @@ ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
-COPY ./requirements.txt .
-RUN python -m pip install -r requirements.txt
-
+# Copy package files first
+COPY ./pyproject.toml .
 COPY ./tomorrow /app/tomorrow
+
+# Install package in editable mode
+RUN python -m pip install -e .
+
+# Copy DLT configuration
+COPY ./.dlt /app/.dlt
