@@ -9,6 +9,8 @@ dependencies = [
     "s3fs",
     "pyarrow",
     "fsspec",
+    "sqlmesh[web]",
+    "duckdb",
 ]
 
 [project.optional-dependencies]

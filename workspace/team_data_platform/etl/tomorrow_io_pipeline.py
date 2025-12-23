@@ -142,7 +142,7 @@ def run_pipeline():
         pipeline_name="tomorrow_io",
         destination=dlt.destinations.duckdb(duckdb_path),
         dataset_name="weather",
-        dev_mode=True,
+        dev_mode=False,
         progress="log",
     )
 
