@@ -28,4 +28,4 @@ def get_duckdb_path() -> Path:
     # Default to data/weather.duckdb in project root
     data_dir = get_project_root() / "data"
     data_dir.mkdir(exist_ok=True)  # Ensure data directory exists
-    return data_dir / "weather.duckdb"
+    return data_dir / "weather.db"
