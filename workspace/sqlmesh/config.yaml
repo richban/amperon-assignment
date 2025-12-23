@@ -1,0 +1,42 @@
+# --- Gateway Connection ---
+gateways:
+  duckdb:
+    connection:
+      # For more information on configuring the connection to your execution engine, visit:
+      # https://sqlmesh.readthedocs.io/en/stable/reference/configuration/#connection
+      # https://sqlmesh.readthedocs.io/en/stable/integrations/engines/duckdb/#connection-options
+      type: duckdb
+      database: ../../data/weather.db  # Use the weather.db from project root/data/
+      concurrent_tasks: 1
+      # register_comments: True
+      # pre_ping: False
+      # pretty_sql: False
+      # schema_differ_overrides:
+      # catalog_type_overrides:
+      # catalogs:
+      # extensions:
+      # connector_config:
+      # secrets:
+      # filesystems:
+      # token:
+
+default_gateway: duckdb
+
+# --- Model Defaults ---
+# https://sqlmesh.readthedocs.io/en/stable/reference/model_configuration/#model-defaults
+
+model_defaults:
+  dialect: duckdb
+  start: 2025-12-23  # Start date for backfill history (today)
+  cron: '@hourly'    # Run models hourly to match DLT pipeline schedule
+
+# --- Linting Rules ---
+# Enforce standards for your team
+# https://sqlmesh.readthedocs.io/en/stable/guides/linter/
+
+linter:
+  enabled: true
+  rules:
+    - ambiguousorinvalidcolumn
+    - invalidselectstarexpansion
+    - noambiguousprojections
