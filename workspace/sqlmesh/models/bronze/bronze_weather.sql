@@ -8,67 +8,83 @@ MODEL (
 );
 
 /*
-  Staging Model: Weather Raw Data
+  Staging Model: Weather Raw Data (Versioned Snapshots, Normalized Schema)
 
-  This model reads from the latest DLT-generated weather schema and:
-  1. Cleans column names (removes prefixes, snake_case normalization)
-  2. Casts data types appropriately
-  3. Adds data quality flags
-  4. Prepares data for downstream mart models
+  This model reads from DLT-generated tables:
+  - weather_data.weather_observations (fact table with weather measurements)
+  - weather_data.locations (dimension table with location details)
 
-  Source: DLT pipeline writes to weather.weather_timelines
+  Features:
+  1. Joins normalized tables (fact + dimension)
+  2. Cleans column names (removes prefixes, snake_case normalization)
+  3. Casts data types appropriately
+  4. Preserves run_timestamp for bitemporal analysis
+  5. Adds data quality flags
+  6. Prepares data for downstream mart models
+
+  Schema:
+  - Normalized: weather_observations contains only _locations_id (FK)
+  - Location details (name, lat, lon) joined from locations dimension table
+  
+  Bitemporal dimensions:
+  - start_time (forecast_timestamp): WHEN the weather event occurs
+  - run_timestamp (observation_timestamp): WHEN we made the forecast
 */
 
 WITH latest_weather_data AS (
-  -- Select from the most recent DLT schema
-  -- Note: In production, you'd query information_schema to get the latest schema dynamically
-  -- For now, we'll use a specific schema (will need to be updated after each DLT run)
   SELECT
-    -- Timestamp
-    start_time AS timestamp_utc,
+    -- Bitemporal timestamps
+    w.start_time AS forecast_timestamp_utc,
+    w.run_timestamp AS observation_timestamp_utc,
 
-    -- Location metadata
-    _locations_id AS location_id,
-    _locations_name AS location_name,
-    _locations_lat AS latitude,
-    _locations_lon AS longitude,
+    -- Location metadata (from dimension table)
+    w._locations_id AS location_id,
+    l.name AS location_name,
+    l.lat AS latitude,
+    l.lon AS longitude,
 
     -- Core weather measurements
-    values__temperature AS temperature_celsius,
-    values__temperature_apparent AS feels_like_celsius,
-    values__humidity AS humidity_percent,
-    values__wind_speed AS wind_speed_mps,
-    values__wind_direction AS wind_direction_degrees,
+    w.values__temperature AS temperature_celsius,
+    w.values__temperature_apparent AS feels_like_celsius,
+    w.values__humidity AS humidity_percent,
+    w.values__wind_speed AS wind_speed_mps,
+    w.values__wind_direction AS wind_direction_degrees,
 
     -- Precipitation
     COALESCE(
-      values__precipitation_intensity__v_double,
-      CAST(values__precipitation_intensity AS DOUBLE)
+      w.values__precipitation_intensity__v_double,
+      CAST(w.values__precipitation_intensity AS DOUBLE)
     ) AS precipitation_intensity_mmh,
-    values__precipitation_probability AS precipitation_probability_percent,
-    values__precipitation_type AS precipitation_type_code,
+    w.values__precipitation_probability AS precipitation_probability_percent,
+    w.values__precipitation_type AS precipitation_type_code,
 
     -- Atmospheric conditions
-    values__weather_code AS weather_code,
-    values__cloud_cover AS cloud_cover_percent,
-    values__pressure_surface_level AS pressure_hpa,
-    values__visibility AS visibility_km,
+    w.values__weather_code AS weather_code,
+    w.values__cloud_cover AS cloud_cover_percent,
+    w.values__pressure_surface_level AS pressure_hpa,
+    w.values__visibility AS visibility_km,
 
     -- DLT metadata
-    TO_TIMESTAMP(CAST(_dlt_load_id AS DOUBLE)) as _dlt_load_time,
-    _dlt_load_id,
-    _dlt_id
+    TO_TIMESTAMP(CAST(w._dlt_load_id AS DOUBLE)) as _dlt_load_time,
+    w._dlt_load_id,
+    w._dlt_id
 
-  FROM weather.weather_timelines
+  FROM weather_data.weather_observations w
+  INNER JOIN weather_data.locations l ON w._locations_id = l.id
 )
 
 SELECT
-  -- All columns from CTE
-  timestamp_utc,
+  -- Bitemporal timestamps
+  forecast_timestamp_utc,
+  observation_timestamp_utc,
+  
+  -- Location metadata
   location_id,
   location_name,
   latitude,
   longitude,
+  
+  -- Weather measurements
   temperature_celsius,
   feels_like_celsius,
   humidity_percent,
@@ -81,9 +97,11 @@ SELECT
   cloud_cover_percent,
   pressure_hpa,
   visibility_km,
+  
+  -- DLT metadata
   _dlt_load_time,
   _dlt_load_id,
-  _dlt_record_id,
+  _dlt_id,
 
   -- Add data quality flags
   CASE
@@ -111,4 +129,4 @@ SELECT
   CURRENT_TIMESTAMP AS transformed_at
 
 FROM latest_weather_data
-ORDER BY location_id, timestamp_utc;
+ORDER BY location_id, forecast_timestamp_utc, observation_timestamp_utc;

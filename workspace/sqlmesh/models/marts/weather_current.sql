@@ -14,7 +14,7 @@ MODEL (
   "What is the current temperature and wind speed for each location?"
 
   This model provides the most recent weather observation for each location,
-  including temperature and wind speed as requested.
+  using the latest observation_timestamp to get the freshest forecast.
 */
 
 WITH latest_per_location AS (
@@ -23,7 +23,8 @@ WITH latest_per_location AS (
     location_name,
     latitude,
     longitude,
-    timestamp_utc,
+    forecast_timestamp_utc,
+    observation_timestamp_utc,
     temperature_celsius,
     wind_speed_mps,
     humidity_percent,
@@ -31,7 +32,7 @@ WITH latest_per_location AS (
     precipitation_type_label,
     ROW_NUMBER() OVER (
       PARTITION BY location_id
-      ORDER BY timestamp_utc DESC
+      ORDER BY observation_timestamp_utc DESC, forecast_timestamp_utc DESC
     ) AS recency_rank
   FROM bronze_weather
   WHERE has_invalid_temperature = false
@@ -43,7 +44,8 @@ SELECT
   location_name,
   latitude,
   longitude,
-  timestamp_utc AS observation_time,
+  forecast_timestamp_utc AS forecast_time,
+  observation_timestamp_utc AS observed_at,
   temperature_celsius AS current_temperature_c,
   wind_speed_mps AS current_wind_speed_mps,
   ROUND(wind_speed_mps * 3.6, 1) AS current_wind_speed_kmh,  -- Convert m/s to km/h

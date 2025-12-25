@@ -13,16 +13,22 @@ MODEL (
   Answers Assignment Question 2:
   "What is the hourly forecast for each location for the next 5 days?"
 
-  This model provides hourly weather data from -1 day to +5 days (as available)
-  for all locations, formatted for easy querying and visualization.
+  This model provides hourly weather data using the latest observation snapshot
+  for each location, ensuring users get the freshest forecast data.
 */
+
+WITH latest_observation AS (
+  SELECT MAX(observation_timestamp_utc) AS latest_obs_time
+  FROM bronze_weather
+)
 
 SELECT
   location_id,
   location_name,
   latitude,
   longitude,
-  timestamp_utc AS forecast_hour,
+  forecast_timestamp_utc AS forecast_hour,
+  observation_timestamp_utc AS observed_at,
 
   -- Temperature metrics
   temperature_celsius,
@@ -57,17 +63,18 @@ SELECT
   weather_code,
 
   -- Time context helpers
-  DATE_TRUNC('day', timestamp_utc) AS forecast_date,
-  EXTRACT(HOUR FROM timestamp_utc) AS forecast_hour_of_day,
+  DATE_TRUNC('day', forecast_timestamp_utc) AS forecast_date,
+  EXTRACT(HOUR FROM forecast_timestamp_utc) AS forecast_hour_of_day,
   CASE
-    WHEN timestamp_utc < CURRENT_TIMESTAMP THEN 'Historical'
+    WHEN forecast_timestamp_utc < CURRENT_TIMESTAMP THEN 'Historical'
     ELSE 'Forecast'
   END AS data_type,
 
   -- Metadata
   CURRENT_TIMESTAMP AS refreshed_at
 
-FROM bronze_weather
+FROM bronze_weather, latest_observation
 WHERE has_invalid_temperature = false
   AND has_invalid_wind = false
-ORDER BY location_id, timestamp_utc;
+  AND observation_timestamp_utc = latest_observation.latest_obs_time
+ORDER BY location_id, forecast_timestamp_utc;
