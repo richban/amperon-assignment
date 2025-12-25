@@ -138,8 +138,6 @@ def get_absolute_time_params(run_ts: datetime) -> Dict[str, str]:
     }
 
 
-
-
 @dlt.resource(name="locations", write_disposition="replace")
 def locations() -> Generator[List[Dict[str, Any]], Any, None]:
     """
@@ -227,7 +225,7 @@ def tomorrow_io_source(
                     "data_selector": "data.timelines[0].intervals",
                     "paginator": {"type": "single_page"},
                 },
-                "include_from_parent": ["id", "name", "lat", "lon"],
+                "include_from_parent": ["id"],
             },
             locations(),
         ],
@@ -249,9 +247,9 @@ def tomorrow_io_source(
         - start_time: WHEN the weather event occurs (forecast_timestamp)
         - run_timestamp: WHEN we observed/predicted it (observation_timestamp)
 
-        Note: Item structure from include_from_parent creates fields like:
-        - _locations_id, _locations_name, _locations_lat, _locations_lon
-        - Plus all fields from the interval (startTime, values, etc.)
+        Normalized schema:
+        - Only includes _locations_id (foreign key to locations table)
+        - Location details (name, lat, lon) stored in separate locations dimension table
         """
         # Handle both dict items and list of items
         if isinstance(item, list):
@@ -269,7 +267,7 @@ def tomorrow_io_source(
             logger.warning(f"Unexpected item type: {type(item)}")
             yield item
 
-    return add_versioning_metadata
+    return source.resources["locations"], add_versioning_metadata
 
 
 def run_pipeline(backfill_datetime: Optional[str] = None):
