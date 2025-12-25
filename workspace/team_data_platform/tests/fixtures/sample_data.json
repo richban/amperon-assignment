@@ -1,0 +1,93 @@
+{
+  "locations": [
+    {
+      "id": 1,
+      "name": "Port Brownsville 1",
+      "lat": 25.86,
+      "lon": -97.42
+    },
+    {
+      "id": 2,
+      "name": "Port Brownsville 2",
+      "lat": 25.90,
+      "lon": -97.52
+    }
+  ],
+  "weather_intervals": [
+    {
+      "startTime": "2025-12-23T13:00:00Z",
+      "values": {
+        "temperature": 25.5,
+        "temperatureApparent": 24.8,
+        "humidity": 65,
+        "windSpeed": 5.2,
+        "windDirection": 180,
+        "precipitationIntensity": 0,
+        "precipitationProbability": 10,
+        "precipitationType": 0,
+        "weatherCode": 1000,
+        "cloudCover": 25,
+        "pressureSurfaceLevel": 1013.25,
+        "visibility": 10.0
+      }
+    },
+    {
+      "startTime": "2025-12-23T14:00:00Z",
+      "values": {
+        "temperature": 26.0,
+        "temperatureApparent": 25.2,
+        "humidity": 62,
+        "windSpeed": 4.8,
+        "windDirection": 175,
+        "precipitationIntensity": 0,
+        "precipitationProbability": 8,
+        "precipitationType": 0,
+        "weatherCode": 1000,
+        "cloudCover": 20,
+        "pressureSurfaceLevel": 1013.50,
+        "visibility": 10.0
+      }
+    },
+    {
+      "startTime": "2025-12-23T15:00:00Z",
+      "values": {
+        "temperature": 26.5,
+        "temperatureApparent": 25.7,
+        "humidity": 60,
+        "windSpeed": 4.5,
+        "windDirection": 170,
+        "precipitationIntensity": 0,
+        "precipitationProbability": 5,
+        "precipitationType": 0,
+        "weatherCode": 1000,
+        "cloudCover": 15,
+        "pressureSurfaceLevel": 1013.75,
+        "visibility": 10.0
+      }
+    }
+  ],
+  "api_response_success": {
+    "data": {
+      "timelines": [
+        {
+          "timestep": "1h",
+          "startTime": "2025-12-23T13:00:00Z",
+          "endTime": "2025-12-23T16:00:00Z",
+          "intervals": "PLACEHOLDER_INTERVALS"
+        }
+      ]
+    }
+  },
+  "api_response_rate_limit": {
+    "type": "https://api.tomorrow.io/errors/rate-limit",
+    "title": "Rate Limit Exceeded",
+    "status": 429,
+    "detail": "You have exceeded the rate limit of 25 requests per hour"
+  },
+  "api_response_invalid_location": {
+    "type": "https://api.tomorrow.io/errors/invalid-location",
+    "title": "Invalid Location",
+    "status": 400,
+    "detail": "The provided location coordinates are invalid"
+  }
+}
