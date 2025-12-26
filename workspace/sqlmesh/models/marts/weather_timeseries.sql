@@ -24,9 +24,6 @@ WITH latest_observation AS (
 
 SELECT
   location_id,
-  location_name,
-  latitude,
-  longitude,
   forecast_timestamp_utc AS forecast_hour,
   observation_timestamp_utc AS observed_at,
 

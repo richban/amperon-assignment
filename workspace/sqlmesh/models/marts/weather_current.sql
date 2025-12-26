@@ -20,9 +20,6 @@ MODEL (
 WITH latest_per_location AS (
   SELECT
     location_id,
-    location_name,
-    latitude,
-    longitude,
     forecast_timestamp_utc,
     observation_timestamp_utc,
     temperature_celsius,
@@ -41,9 +38,6 @@ WITH latest_per_location AS (
 
 SELECT
   location_id,
-  location_name,
-  latitude,
-  longitude,
   forecast_timestamp_utc AS forecast_time,
   observation_timestamp_utc AS observed_at,
   temperature_celsius AS current_temperature_c,
