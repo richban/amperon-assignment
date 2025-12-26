@@ -1,9 +1,0 @@
-type: dagster_dlt.DltLoadCollectionComponent
-
-attributes:
-  loads:
-    - source: .loads.weather_source
-      pipeline: .loads.weather_pipeline
-      translation:
-        group_name: weather_ingestion
-        description: "Loads weather forecasts from Tomorrow.io API to DuckDB bronze tables"

@@ -1,8 +1,7 @@
-from pathlib import Path
+import dagster as dg
 
-from dagster import definitions, load_from_defs_folder
+import dg_amperon.defs
 
-
-@definitions
-def defs():
-    return load_from_defs_folder(path_within_project=Path(__file__).parent)
+defs = dg.Definitions.merge(
+    dg.components.load_defs(dg_amperon.defs),
+)
