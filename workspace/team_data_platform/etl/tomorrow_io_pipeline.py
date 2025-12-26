@@ -26,10 +26,10 @@ from dlt.sources.rest_api import rest_api_source
 from dlt.sources.rest_api.typing import RESTAPIConfig
 from typing import List, Dict, Any, Generator, Optional
 from datetime import datetime, timedelta
-from utils import get_duckdb_path
+from etl.utils import get_duckdb_path
 
 # Configure DLT logging level
-os.environ.setdefault("RUNTIME__LOG_LEVEL", "INFO")
+os.environ.setdefault("RUNTIME__LOG_LEVEL", "WARNING")
 
 # Get DLT logger
 logger = logging.getLogger("dlt")
@@ -293,13 +293,6 @@ def run_pipeline(backfill_datetime: Optional[str] = None):
     run_ts = get_normalized_run_timestamp(backfill_datetime)
     mode = "BACKFILL" if backfill_datetime else "SCHEDULED"
 
-    logger.info("")
-    logger.info("=" * 60)
-    logger.info(f"MODE: {mode}")
-    logger.info(f"RUN TIMESTAMP: {run_ts.isoformat()}")
-    logger.info("=" * 60)
-    logger.info("")
-
     # Create pipeline
     pipeline = dlt.pipeline(
         pipeline_name="tomorrow_io",
@@ -309,14 +302,8 @@ def run_pipeline(backfill_datetime: Optional[str] = None):
         progress="log",
     )
 
-    # Run pipeline
     load_info = pipeline.run(tomorrow_io_source(backfill_datetime=backfill_datetime))
 
-    # Success summary
-    logger.info("")
-    logger.info("=" * 60)
-    logger.info(f"Pipeline completed for: {run_ts.isoformat()}")
-    logger.info("=" * 60)
     logger.info(f"Load info: {load_info}")
     logger.info(f"Database: {get_duckdb_path()}")
 
