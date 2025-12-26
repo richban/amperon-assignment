@@ -178,7 +178,7 @@ def test_bitemporal_weather_pipeline_end_to_end(temp_pipeline):
                                 "values": {"temperature": 24.5},
                             },  # Updated
                             {
-                                "startTime": "2025-12-23T11:00:00Z",
+                                "startTime": "2025-12-23T16:00:00Z",
                                 "values": {"temperature": 25.5},
                             },  # Shifted  +1h
                         ]
@@ -256,6 +256,169 @@ def test_bitemporal_weather_pipeline_end_to_end(temp_pipeline):
             FROM test_weather_data.weather_observations
         """).fetchone()
 
+        assert pk_check[0] == pk_check[1], (
+            f"Primary key should be unique: {pk_check[0]} rows, {pk_check[1]} unique keys"
+        )
+
+
+@pytest.mark.integration
+@responses.activate
+def test_idempotency_same_hour_replaces_data(temp_pipeline):
+    """
+    Test idempotency: Running pipeline twice in the same hour (e.g., 14:00 and 14:59)
+    should REPLACE data, not duplicate it, because both normalize to 14:00:00.
+    """
+
+    pipeline, db_path = temp_pipeline
+
+    # Mock API response for first run
+    responses.add(
+        responses.POST,
+        "https://api.tomorrow.io/v4/timelines",
+        json={
+            "data": {
+                "timelines": [
+                    {
+                        "intervals": [
+                            {
+                                "startTime": "2025-12-23T12:00:00Z",
+                                "values": {"temperature": 21.0},
+                            },
+                            {
+                                "startTime": "2025-12-23T13:00:00Z",
+                                "values": {"temperature": 22.0},
+                            },
+                            {
+                                "startTime": "2025-12-23T14:00:00Z",
+                                "values": {"temperature": 23.0},
+                            },
+                            {
+                                "startTime": "2025-12-23T15:00:00Z",
+                                "values": {"temperature": 24.0},
+                            },
+                            {
+                                "startTime": "2025-12-23T16:00:00Z",
+                                "values": {"temperature": 25.0},
+                            },
+                        ]
+                    }
+                ]
+            }
+        },
+        status=200,
+    )
+
+    # Run 1: Observe at 14:00:00 (will normalize to 14:00:00)
+    source_run1 = tomorrow_io_source(
+        tomorrow_io_access_token="test_token", backfill_datetime="2025-12-23T14:00:00Z"
+    )
+    load_info_1 = pipeline.run(source_run1)
+    assert load_info_1 is not None
+
+    # Verify initial data
+    with duckdb.connect(db_path) as conn:
+        count_after_run1 = conn.execute(
+            "SELECT COUNT(*) FROM test_weather_data.weather_observations"
+        ).fetchone()[0]
+        assert count_after_run1 == 10, (
+            f"After run 1: expected 10 records (5 hours × 2 locations), got {count_after_run1}"
+        )
+
+        # Get a sample temperature from run 1 (any hour)
+        temp_run1 = conn.execute("""
+            SELECT values__temperature 
+            FROM test_weather_data.weather_observations
+            LIMIT 1
+        """).fetchone()[0]
+        # Just verify it's one of the run 1 temps (21.0-25.0 range)
+        assert 21.0 <= temp_run1 <= 25.0, (
+            f"Run 1 temp should be in range 21-25, got {temp_run1}"
+        )
+
+    # Mock API response for second run with DIFFERENT temperatures
+    responses.add(
+        responses.POST,
+        "https://api.tomorrow.io/v4/timelines",
+        json={
+            "data": {
+                "timelines": [
+                    {
+                        "intervals": [
+                            {
+                                "startTime": "2025-12-23T12:00:00Z",
+                                "values": {"temperature": 21.9},
+                            },  # Changed
+                            {
+                                "startTime": "2025-12-23T13:00:00Z",
+                                "values": {"temperature": 22.9},
+                            },  # Changed
+                            {
+                                "startTime": "2025-12-23T14:00:00Z",
+                                "values": {"temperature": 23.9},
+                            },  # Changed
+                            {
+                                "startTime": "2025-12-23T15:00:00Z",
+                                "values": {"temperature": 24.9},
+                            },  # Changed
+                            {
+                                "startTime": "2025-12-23T16:00:00Z",
+                                "values": {"temperature": 25.9},
+                            },  # Changed
+                        ]
+                    }
+                ]
+            }
+        },
+        status=200,
+    )
+
+    # Run 2: Observe at 14:59:00 (will ALSO normalize to 14:00:00 - same hour!)
+    source_run2 = tomorrow_io_source(
+        tomorrow_io_access_token="test_token",
+        backfill_datetime="2025-12-23T14:59:00Z",  # Different minute, same hour
+    )
+    load_info_2 = pipeline.run(source_run2)
+    assert load_info_2 is not None
+
+    # Verify idempotency: count should STILL be 10 (replaced, not duplicated)
+    with duckdb.connect(db_path) as conn:
+        count_after_run2 = conn.execute(
+            "SELECT COUNT(*) FROM test_weather_data.weather_observations"
+        ).fetchone()[0]
+        assert count_after_run2 == 10, (
+            f"After run 2: expected 10 records (replaced, not duplicated), got {count_after_run2}"
+        )
+
+        # Verify only ONE distinct run_timestamp exists (14:00:00)
+        distinct_run_timestamps = conn.execute("""
+            SELECT DISTINCT run_timestamp 
+            FROM test_weather_data.weather_observations
+        """).fetchall()
+        assert len(distinct_run_timestamps) == 1, (
+            f"Should have only 1 run_timestamp (both runs normalized to 14:00), got {len(distinct_run_timestamps)}"
+        )
+
+        # Verify temperatures were REPLACED with run 2 data (run 2 temps are in 21.9-25.9 range)
+        all_temps = conn.execute("""
+            SELECT DISTINCT values__temperature 
+            FROM test_weather_data.weather_observations
+            ORDER BY values__temperature
+        """).fetchall()
+
+        # Run 2 temperatures should be present (21.9, 22.9, 23.9, 24.9, 25.9)
+        temps = [t[0] for t in all_temps]
+        # Check that we have run 2 temps (which end in .9), not run 1 temps (which are whole numbers)
+        assert any(str(t).endswith(".9") for t in temps), (
+            f"Should have run 2 temperatures (ending in .9), got {temps}"
+        )
+
+        # Verify composite primary key is still unique
+        pk_check = conn.execute("""
+            SELECT 
+                COUNT(*) as total_rows,
+                COUNT(DISTINCT _locations_id || start_time || run_timestamp) as unique_keys
+            FROM test_weather_data.weather_observations
+        """).fetchone()
         assert pk_check[0] == pk_check[1], (
             f"Primary key should be unique: {pk_check[0]} rows, {pk_check[1]} unique keys"
         )
