@@ -12,17 +12,17 @@ def _():
     import duckdb
     from pathlib import Path
     from lonboard import Map, H3HexagonLayer
-    import numpy as np
     import matplotlib.pyplot as plt
+    from matplotlib.colors import Normalize
     from lonboard.colormap import apply_continuous_cmap
     return (
         H3HexagonLayer,
         Map,
+        Normalize,
         Path,
         apply_continuous_cmap,
         duckdb,
         mo,
-        np,
         plt,
     )
 
@@ -39,7 +39,7 @@ def _(Path, duckdb):
 @app.cell
 def _(conn, mo):
     forecast_hours_df = mo.sql(
-        f"""
+        """
         SELECT DISTINCT
             forecast_hour
         FROM
@@ -49,6 +49,7 @@ def _(conn, mo):
         ORDER BY
             forecast_hour
         """,
+        output=False,
         engine=conn
     )
     return (forecast_hours_df,)
@@ -81,10 +82,10 @@ def _(forecast_hours_df, time_slider):
 def _(conn, selected_hour):
     query = f"""
         WITH location_coords AS (
-            SELECT id, lat, lon 
+            SELECT id, lat, lon
             FROM weather_data.locations
         )
-        SELECT 
+        SELECT
             h3_latlng_to_cell(l.lat, l.lon, 9) AS hex_id,
             AVG(w.temperature_celsius) AS temperature,
             AVG(l.lat) AS lat,
@@ -101,18 +102,20 @@ def _(conn, selected_hour):
 
 
 @app.cell
-def _(apply_continuous_cmap, np, plt):
+def _(Normalize, apply_continuous_cmap, plt):
     def generate_colors(table):
         # Extract temperature column as numpy array
         temp_values = table["temperature"].to_numpy()
-    
+
         # Normalize to 0-1 range based on expected climate bounds
-        norm_values = (temp_values - 20) / (35 - 20)
-        norm_values = np.clip(norm_values, 0, 1)
-    
+        min_temp, max_temp = -20, 50
+        normalizer = Normalize(vmin=min_temp, vmax=max_temp, clip=True)
+        normalized = normalizer(temp_values)
+
         # Apply colormap (e.g., 'inferno' for heat)
-        cmap = plt.get_cmap('inferno')
-        return apply_continuous_cmap(norm_values, cmap)
+        # cmap = plt.get_cmap('inferno')
+        cmap = plt.get_cmap('RdYlBu_r')
+        return apply_continuous_cmap(normalized, cmap)
     return (generate_colors,)
 
 
@@ -125,7 +128,7 @@ def _(H3HexagonLayer, Map, generate_colors, weather_arrow):
         get_hexagon=weather_arrow["hex_id"],
         get_fill_color=colors,
         extruded=True,
-        # get_elevation=weather_arrow["temperature"].to_numpy() * 100,
+        get_elevation=weather_arrow["temperature"].to_numpy() * 100,
         opacity=0.8,
         pickable=True,
     )
