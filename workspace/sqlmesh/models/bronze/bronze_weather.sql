@@ -25,14 +25,14 @@ MODEL (
 
   Bitemporal dimensions:
   - start_time (forecast_timestamp): WHEN the weather event occurs
-  - run_timestamp (observation_timestamp): WHEN we made the forecast
+  - observation_timestamp: WHEN we made the forecast
 */
 
 WITH latest_weather_data AS (
   SELECT
     -- Bitemporal timestamps
     start_time AS forecast_timestamp_utc,
-    run_timestamp AS observation_timestamp_utc,
+    observation_timestamp AS observation_timestamp_utc,
 
     _locations_id AS location_id,
 

@@ -72,13 +72,15 @@ WEATHER_FIELDS = [
 # =============================================================================
 
 
-def get_normalized_run_timestamp(backfill_datetime: Optional[str] = None) -> datetime:
+def get_normalized_observation_timestamp(
+    backfill_datetime: Optional[str] = None,
+) -> datetime:
     """
-    Get normalized run timestamp (floored to hour boundary).
+    Get normalized hour-boundary timestamp for the pipeline run.
 
-    This ensures idempotent pipeline runs by normalizing execution time
-    to the start of the hour. Running at 13:05, 13:23, or 13:59 all use
-    13:00:00 as the run_timestamp.
+    Normalizes execution time to the hour boundary (floor) for idempotency.
+    For example, any run between 13:00 and 13:59:59 gets normalized to
+    13:00:00 as the observation_timestamp.
 
     Args:
         backfill_datetime: Optional ISO format datetime string for backfill
@@ -89,10 +91,9 @@ def get_normalized_run_timestamp(backfill_datetime: Optional[str] = None) -> dat
         datetime: Normalized to hour boundary (minute=0, second=0, microsecond=0)
 
     Examples:
-        >>> get_normalized_run_timestamp()  # Called at 13:47:22
-        datetime(2025, 12, 23, 13, 0, 0)
-
-        >>> get_normalized_run_timestamp("2025-12-22T15:30:00Z")
+        >>> get_normalized_observation_timestamp()  # Called at 13:47:22
+        datetime(2025, 12, 26, 13, 0, 0)
+        >>> get_normalized_observation_timestamp("2025-12-22T15:30:00Z")
         datetime(2025, 12, 22, 15, 0, 0)
     """
     if backfill_datetime:
@@ -106,31 +107,32 @@ def get_normalized_run_timestamp(backfill_datetime: Optional[str] = None) -> dat
     return ts.replace(minute=0, second=0, microsecond=0)
 
 
-def get_absolute_time_params(run_ts: datetime) -> Dict[str, str]:
+def get_absolute_time_params(observation_ts: datetime) -> Dict[str, str]:
     """
-    Calculate absolute startTime/endTime from normalized run timestamp.
+    Calculate fixed time window for API request based on observation timestamp.
 
-    This creates a fixed time window for the API call, ensuring idempotency.
-    The same run_timestamp always produces the same time window.
+    Uses absolute timestamps (not relative "nowMinus24h") to ensure
+    deterministic results. The same observation_timestamp always returns the same window.
 
     Args:
-        run_ts: Normalized run timestamp (from get_normalized_run_timestamp)
+        observation_ts: Normalized observation timestamp (datetime object)
 
     Returns:
-        Dict with ISO 8601 formatted startTime and endTime:
-        - startTime: run_ts - 24 hours (historical observations)
-        - endTime: run_ts + 5 days (forecast window)
+        Dict with startTime and endTime in ISO format:
+        - startTime: observation_ts - 24 hours (historical observations)
+        - endTime: observation_ts + 5 days (forecast window)
 
-    Examples:
-        >>> run_ts = datetime(2025, 12, 23, 13, 0, 0)
-        >>> get_absolute_time_params(run_ts)
-        {
-            'startTime': '2025-12-22T13:00:00Z',  # -24 hours
-            'endTime': '2025-12-28T13:00:00Z'     # +5 days
-        }
+    Example:
+        >>> observation_ts = datetime(2025, 12, 23, 13, 0, 0)
+        >>> get_absolute_time_params(observation_ts)
+        {'startTime': '2025-12-22T13:00:00', 'endTime': '2025-12-28T13:00:00'}
+
+    This gives us ~145 hours of data:
+    - 24 hours historical (observations)
+    - 121 hours forecast (5 days)
     """
-    start_time = run_ts - timedelta(hours=24)
-    end_time = run_ts + timedelta(days=5)
+    start_time = observation_ts - timedelta(hours=24)
+    end_time = observation_ts + timedelta(days=5)
 
     return {
         "startTime": start_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -170,24 +172,24 @@ def tomorrow_io_source(
                           Example: "2025-12-23T13:00:00"
 
     Returns:
-        DLT transformer resource with run_timestamp enrichment
+        DLT transformer resource with observation_timestamp enrichment
 
     Architecture:
         1. locations (seed) → weather_timelines (REST API) → weather_observations (transformer)
         2. Each run creates ~145-146 versioned records per location
-        3. Composite PK [_locations_id, start_time, run_timestamp] enables:
+        3. Composite PK [_locations_id, start_time, observation_timestamp] enables:
            - Idempotent reruns (same hour replaces snapshot)
            - Version tracking (different hours create new snapshots)
     """
     # 1. Calculate normalized run timestamp
-    run_ts = get_normalized_run_timestamp(backfill_datetime)
-    run_ts_iso = run_ts.isoformat() + "Z"
+    observation_ts = get_normalized_observation_timestamp(backfill_datetime)
+    observation_ts_iso = observation_ts.isoformat() + "Z"
 
     # 2. Calculate absolute time window (for API idempotency)
-    time_params = get_absolute_time_params(run_ts)
+    time_params = get_absolute_time_params(observation_ts)
 
     # 3. Log execution context
-    logger.info(f"Pipeline Observation Time: {run_ts_iso}")
+    logger.info(f"Pipeline Observation Time: {observation_ts_iso}")
     logger.info(
         f"API Time Window: {time_params['startTime']} to {time_params['endTime']}"
     )
@@ -237,15 +239,14 @@ def tomorrow_io_source(
         data_from=source.resources["weather_timelines"],
         name="weather_observations",
         write_disposition="merge",
-        primary_key=["_locations_id", "start_time", "run_timestamp"],
+        primary_key=["_locations_id", "start_time", "observation_timestamp"],
     )
     def add_versioning_metadata(item):
         """
-        Inject run_timestamp into each weather observation.
+        Inject observation_timestamp into each weather observation.
 
-        This creates the bitemporal model:
-        - start_time: WHEN the weather event occurs (forecast_timestamp)
-        - run_timestamp: WHEN we observed/predicted it (observation_timestamp)
+        Adds:
+        - observation_timestamp: WHEN we observed/predicted it
 
         Normalized schema:
         - Only includes _locations_id (foreign key to locations table)
@@ -256,11 +257,11 @@ def tomorrow_io_source(
             # If item is a list, process each element
             for record in item:
                 if isinstance(record, dict):
-                    record["run_timestamp"] = run_ts_iso
+                    record["observation_timestamp"] = observation_ts_iso
                     yield record
         elif isinstance(item, dict):
             # Single dict item
-            item["run_timestamp"] = run_ts_iso
+            item["observation_timestamp"] = observation_ts_iso
             yield item
         else:
             # Unexpected type
@@ -290,7 +291,7 @@ def create_pipeline(backfill_datetime: Optional[str] = None):
         >>> run_pipeline(backfill_datetime="2025-12-22T13:00:00")
     """
     # Determine run timestamp for logging
-    run_ts = get_normalized_run_timestamp(backfill_datetime)
+    observation_ts = get_normalized_observation_timestamp(backfill_datetime)
     mode = "BACKFILL" if backfill_datetime else "SCHEDULED"
 
     # Create pipeline
@@ -325,7 +326,7 @@ def run_pipeline(backfill_datetime: Optional[str] = None):
         >>> run_pipeline(backfill_datetime="2025-12-22T13:00:00")
     """
     # Determine run timestamp for logging
-    run_ts = get_normalized_run_timestamp(backfill_datetime)
+    observation_ts = get_normalized_observation_timestamp(backfill_datetime)
     mode = "BACKFILL" if backfill_datetime else "SCHEDULED"
 
     # Create pipeline
