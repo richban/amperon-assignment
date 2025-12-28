@@ -1,4 +1,4 @@
-"""Interactive Weather Visualization"""
+"""Interactive Weather Visualization - Operational View"""
 
 import marimo
 
@@ -7,7 +7,7 @@ app = marimo.App(width="full", app_title="Weather Forecast Visualization")
 
 
 @app.cell
-def _():
+def __():
     import marimo as mo
     import duckdb
     from pathlib import Path
@@ -15,112 +15,127 @@ def _():
     import matplotlib.pyplot as plt
     from matplotlib.colors import Normalize
     from lonboard.colormap import apply_continuous_cmap
-    return (
-        H3HexagonLayer,
-        Map,
-        Normalize,
-        Path,
-        apply_continuous_cmap,
-        duckdb,
-        mo,
-        plt,
-    )
+
+    return H3HexagonLayer, Map, Normalize, Path, apply_continuous_cmap, duckdb, mo, plt
 
 
 @app.cell
-def _(Path, duckdb):
+def __(Path, duckdb):
     DB_PATH = Path(__file__).parent.parent.parent.parent.parent / "data" / "weather.db"
     conn = duckdb.connect(str(DB_PATH), read_only=True)
-    conn.execute("INSTALL spatial; LOAD spatial;")
     conn.execute("INSTALL h3 FROM community; LOAD h3;")
     return (conn,)
 
 
 @app.cell
-def _(conn, mo):
-    forecast_hours_df = mo.sql(
-        """
-        SELECT DISTINCT
-            forecast_hour
-        FROM
-            default__dev.weather_timeseries
-        WHERE
-            data_type = 'Forecast'
-        ORDER BY
-            forecast_hour
-        """,
-        output=False,
-        engine=conn
-    )
-    return (forecast_hours_df,)
+def __(conn):
+    runs_df = conn.execute("""
+        SELECT DISTINCT observation_timestamp_utc
+        FROM default__dev.bronze_weather
+        ORDER BY observation_timestamp_utc DESC
+    """).df()
+    available_runs = runs_df["observation_timestamp_utc"].tolist()
+    return available_runs, runs_df
 
 
 @app.cell
-def _(forecast_hours_df, mo):
-    max_index = len(forecast_hours_df) - 1
+def __(mo, available_runs):
+    run_selector = mo.ui.dropdown(
+        options={str(run): run for run in available_runs},
+        value=str(available_runs[0]),
+        label="Observation Time (When was forecast made):",
+    )
+    return (run_selector,)
 
+
+@app.cell
+def __(mo, run_selector):
+    selected_run = run_selector.value
+
+    mo.md(f"""
+    # 🌤️ Weather Forecast - Operational View
+    ## Port of Brownsville, TX
+
+    {run_selector}
+
+    **Viewing forecast made at**: {selected_run}
+    """)
+    return (selected_run,)
+
+
+@app.cell
+def __(conn, selected_run):
+    forecast_times_df = conn.execute(f"""
+        SELECT DISTINCT forecast_timestamp_utc
+        FROM default__dev.bronze_weather
+        WHERE observation_timestamp_utc = '{selected_run}'
+        ORDER BY forecast_timestamp_utc
+    """).df()
+    forecast_times = forecast_times_df["forecast_timestamp_utc"].tolist()
+    return forecast_times, forecast_times_df
+
+
+@app.cell
+def __(mo, forecast_times):
     time_slider = mo.ui.slider(
         start=0,
-        stop=max_index,
+        stop=len(forecast_times) - 1,
         value=0,
         step=1,
-        label="Hour",
+        label=f"Forecast Hour (0 = Now, {len(forecast_times) - 1} = +5 Days):",
         debounce=True,
+        show_value=True,
     )
-
-    time_slider
     return (time_slider,)
 
 
 @app.cell
-def _(forecast_hours_df, time_slider):
-    selected_hour = forecast_hours_df[time_slider.value]["forecast_hour"].item()
-    return (selected_hour,)
+def __(mo, time_slider, forecast_times):
+    selected_time = forecast_times[time_slider.value]
+
+    mo.md(f"""
+    ### 🕐 Time Slider
+
+    {time_slider}
+
+    **Currently viewing**: {selected_time}
+    """)
+    return (selected_time,)
 
 
 @app.cell
-def _(conn, selected_hour):
-    query = f"""
-        WITH location_coords AS (
-            SELECT id, lat, lon
-            FROM weather_data.locations
-        )
+def __(conn, selected_run, selected_time):
+    weather_arrow = conn.execute(f"""
         SELECT
             h3_latlng_to_cell(l.lat, l.lon, 9) AS hex_id,
-            AVG(w.temperature_celsius) AS temperature,
+            AVG(bw.temperature_celsius) AS temperature,
+            AVG(bw.wind_speed_mps) AS wind_speed,
             AVG(l.lat) AS lat,
             AVG(l.lon) AS lon
-        FROM default__dev.weather_timeseries w
-        JOIN location_coords l ON w.location_id = l.id
-        WHERE w.forecast_hour = TIMESTAMP '{selected_hour}'
+        FROM default__dev.bronze_weather bw
+        JOIN weather_data.locations l ON l.id = bw.location_id
+        WHERE bw.observation_timestamp_utc = '{selected_run}'
+          AND bw.forecast_timestamp_utc = '{selected_time}'
         GROUP BY hex_id
-    """
-
-    weather_arrow = conn.execute(query).fetch_arrow_table()
-    weather_arrow
+    """).fetch_arrow_table()
     return (weather_arrow,)
 
 
 @app.cell
-def _(Normalize, apply_continuous_cmap, plt):
+def __(Normalize, apply_continuous_cmap, plt):
     def generate_colors(table):
-        # Extract temperature column as numpy array
         temp_values = table["temperature"].to_numpy()
-
-        # Normalize to 0-1 range based on expected climate bounds
         min_temp, max_temp = -20, 50
         normalizer = Normalize(vmin=min_temp, vmax=max_temp, clip=True)
         normalized = normalizer(temp_values)
-
-        # Apply colormap (e.g., 'inferno' for heat)
-        # cmap = plt.get_cmap('inferno')
-        cmap = plt.get_cmap('RdYlBu_r')
+        cmap = plt.get_cmap("RdYlBu_r")
         return apply_continuous_cmap(normalized, cmap)
+
     return (generate_colors,)
 
 
 @app.cell
-def _(H3HexagonLayer, Map, generate_colors, weather_arrow):
+def __(H3HexagonLayer, Map, generate_colors, weather_arrow):
     colors = generate_colors(weather_arrow)
 
     layer = H3HexagonLayer(
@@ -142,18 +157,28 @@ def _(H3HexagonLayer, Map, generate_colors, weather_arrow):
             "pitch": 45,
         },
     )
-    return (map_widget,)
+    return layer, map_widget
 
 
 @app.cell
-def _(map_widget):
+def __(map_widget):
     map_widget
-    return
 
 
 @app.cell
-def _():
-    return
+def __(mo, weather_arrow):
+    temp_values = weather_arrow["temperature"].to_numpy()
+    wind_values = weather_arrow["wind_speed"].to_numpy()
+
+    mo.md(f"""
+    ### 📊 Statistics
+
+    - **Locations**: {len(weather_arrow)} hexagons
+    - **Temperature**: {temp_values.min():.1f}°C - {temp_values.max():.1f}°C (Avg: {temp_values.mean():.1f}°C)
+    - **Wind Speed**: {wind_values.min():.1f} - {wind_values.max():.1f} m/s (Avg: {wind_values.mean():.1f} m/s)
+
+    **Color Legend**: 🔵 Blue = Cold → 🔴 Red = Hot
+    """)
 
 
 if __name__ == "__main__":
