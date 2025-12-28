@@ -41,14 +41,14 @@ logger = logging.getLogger("dlt")
 LOCATIONS = [
     {"id": 1, "name": "Port Brownsville 1", "lat": 25.8600, "lon": -97.4200},
     {"id": 2, "name": "Port Brownsville 2", "lat": 25.9000, "lon": -97.5200},
-    # {"id": 3, "name": "Port Brownsville 3", "lat": 25.9000, "lon": -97.4800},
-    # {"id": 4, "name": "Port Brownsville 4", "lat": 25.9000, "lon": -97.4400},
-    # {"id": 5, "name": "Port Brownsville 5", "lat": 25.9000, "lon": -97.4000},
-    # {"id": 6, "name": "Port Brownsville 6", "lat": 25.9200, "lon": -97.3800},
-    # {"id": 7, "name": "Port Brownsville 7", "lat": 25.9400, "lon": -97.5400},
-    # {"id": 8, "name": "Port Brownsville 8", "lat": 25.9400, "lon": -97.5200},
-    # {"id": 9, "name": "Port Brownsville 9", "lat": 25.9400, "lon": -97.4800},
-    # {"id": 10, "name": "Port Brownsville 10", "lat": 25.9400, "lon": -97.4400},
+    {"id": 3, "name": "Port Brownsville 3", "lat": 25.9000, "lon": -97.4800},
+    {"id": 4, "name": "Port Brownsville 4", "lat": 25.9000, "lon": -97.4400},
+    {"id": 5, "name": "Port Brownsville 5", "lat": 25.9000, "lon": -97.4000},
+    {"id": 6, "name": "Port Brownsville 6", "lat": 25.9200, "lon": -97.3800},
+    {"id": 7, "name": "Port Brownsville 7", "lat": 25.9400, "lon": -97.5400},
+    {"id": 8, "name": "Port Brownsville 8", "lat": 25.9400, "lon": -97.5200},
+    {"id": 9, "name": "Port Brownsville 9", "lat": 25.9400, "lon": -97.4800},
+    {"id": 10, "name": "Port Brownsville 10", "lat": 25.9400, "lon": -97.4400},
 ]
 
 # Core Weather Fields (Free tier)

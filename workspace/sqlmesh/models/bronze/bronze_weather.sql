@@ -16,7 +16,7 @@ MODEL (
   Features:
   2. Cleans column names (removes prefixes, snake_case normalization)
   3. Casts data types appropriately
-  4. Preserves run_timestamp for bitemporal analysis
+  4. Preserves observation_timestamp for bitemporal analysis
   5. Adds data quality flags
   6. Prepares data for downstream mart models
 
