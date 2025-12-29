@@ -1,4 +1,3 @@
-from pathlib import Path
 from dagster import AssetKey
 from dagster_sqlmesh import (
     SQLMeshContextConfig,
@@ -7,12 +6,9 @@ from dagster_sqlmesh import (
 )
 from sqlglot import exp
 from sqlmesh.core.context import Context
+from dg_amperon.defs.weather_ingestion.utils import get_sqlmesh_project_path
 
-# Get the workspace root directory
-WORKSPACE_PATH = Path(__file__).parent.parent.parent.parent.parent.parent
-
-# Define the dbt project path relative to repository root
-SQLMESH_PROJECT_PATH = WORKSPACE_PATH / "sqlmesh"
+SQLMESH_PROJECT_PATH = get_sqlmesh_project_path()
 
 
 class CustomSQLMeshTranslator(SQLMeshDagsterTranslator):

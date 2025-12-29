@@ -1,5 +1,20 @@
+"""
+Dagster assets for Weather Data Ingestion Pipeline.
+
+This module defines Dagster assets and asset checks for the Tomorrow.io weather pipeline.
+
+Configuration:
+    Database path can be configured via environment variable:
+    - DUCKDB_DATABASE: Path to DuckDB database file
+    - If not set, defaults to <project_root>/data/weather.db
+
+Asset Checks:
+    - check_locations_count: Validates that exactly 10 locations are configured
+"""
+
 from dagster import (
     AssetExecutionContext,
+    AssetCheckExecutionContext,
     AssetKey,
     AssetCheckResult,
     AssetCheckSeverity,
@@ -10,13 +25,12 @@ from dg_amperon.defs.weather_ingestion.tomorrow_io_pipeline import (
     tomorrow_io_source,
     create_pipeline,
 )
+from dg_amperon.defs.weather_ingestion.utils import get_duckdb_path
 import duckdb
-from pathlib import Path
 
-# Get database path
-DB_PATH = (
-    Path(__file__).parent.parent.parent.parent.parent.parent / "data" / "weather.db"
-)
+# Get database path using utility function (supports env vars and relative paths)
+DB_PATH = get_duckdb_path()
+
 
 class CustomDagsterDltTranslator(DagsterDltTranslator):
     def get_asset_key(self, resource: DagsterDltResource) -> AssetKey:
@@ -58,7 +72,7 @@ def weather_bronze_assets(
 
 
 @asset_check(asset=AssetKey(["weather_data", "locations"]))
-def check_locations_count(context: AssetExecutionContext) -> AssetCheckResult:
+def check_locations_count(context: AssetCheckExecutionContext) -> AssetCheckResult:
     """Check that we have exactly 10 locations configured."""
     conn = duckdb.connect(str(DB_PATH), read_only=True)
     try:
