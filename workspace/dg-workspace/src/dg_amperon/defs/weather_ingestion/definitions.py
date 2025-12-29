@@ -5,6 +5,7 @@ from dagster import (
     ScheduleDefinition,
     define_asset_job,
     load_assets_from_modules,
+    load_asset_checks_from_modules,
 )
 from dagster_dlt import DagsterDltResource
 from dg_amperon.defs.weather_ingestion import assets
@@ -28,6 +29,7 @@ weather_hourly_schedule = ScheduleDefinition(
 # Export definitions
 defs = Definitions(
     assets=load_assets_from_modules([assets]),
+    asset_checks=load_asset_checks_from_modules([assets]),
     jobs=[weather_bronze_job],
     schedules=[weather_hourly_schedule],
     resources={"dlt": DagsterDltResource()},
