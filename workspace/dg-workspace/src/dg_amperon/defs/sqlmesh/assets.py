@@ -17,4 +17,9 @@ from dg_amperon.defs.sqlmesh.resources import sqlmesh_config
 def sqlmesh_project(
     context: AssetExecutionContext, sqlmesh: SQLMeshResource
 ) -> t.Iterator[MaterializeResult]:
-    yield from sqlmesh.run(context)
+    """SQLMesh transformation assets for weather data."""
+    yield from sqlmesh.run(
+        context,
+        config=sqlmesh_config,
+        environment="dev",
+    )
