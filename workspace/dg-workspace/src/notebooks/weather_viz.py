@@ -241,8 +241,6 @@ def _(conn, get_clicked_hex, mo, selected_run):
             bw.observation_timestamp_utc,
             bw.temperature_celsius,
             bw.feels_like_celsius,
-            bw.precipitation_intensity_mmh,
-            bw.precipitation_probability_percent,
             bw.wind_speed_mps,
             bw.wind_direction_degrees,
             bw.humidity_percent,
@@ -343,43 +341,6 @@ def _(alt, mo, pd, timeseries_df):
 
 @app.cell
 def _(alt, df):
-    # Precipitation and Wind Charts (side by side)
-
-    # Precipitation Bar Chart
-    precip_chart = (
-        alt.Chart(df)
-        .mark_bar()
-        .encode(
-            x=alt.X(
-                "forecast_timestamp_utc:T",
-                title="Forecast Time",
-                axis=alt.Axis(format="%m/%d %H:%M", labelAngle=-45),
-            ),
-            y=alt.Y("precipitation_intensity_mmh:Q", title="Precipitation (mm/h)"),
-            color=alt.Color(
-                "precipitation_probability_percent:Q",
-                scale=alt.Scale(scheme="blues"),
-                legend=alt.Legend(title="Probability %"),
-            ),
-            tooltip=[
-                alt.Tooltip(
-                    "forecast_timestamp_utc:T", title="Time", format="%Y-%m-%d %H:%M"
-                ),
-                alt.Tooltip(
-                    "precipitation_intensity_mmh:Q",
-                    title="Intensity (mm/h)",
-                    format=".2f",
-                ),
-                alt.Tooltip(
-                    "precipitation_probability_percent:Q",
-                    title="Probability",
-                    format=".0f",
-                ),
-            ],
-        )
-        .properties(width=380, height=250, title="Precipitation Forecast")
-    )
-
     # Wind Speed Line Chart
     wind_chart = (
         alt.Chart(df)
@@ -418,7 +379,7 @@ def _(alt, df):
     )
 
     combined_chart = (
-        alt.hconcat(precip_chart, wind_chart)
+        alt.hconcat(wind_chart)
         .configure_axis(labelFontSize=11, titleFontSize=13)
         .configure_title(fontSize=14)
     )
@@ -434,7 +395,7 @@ def _(mo, temp_chart_final):
 
 @app.cell
 def _(combined_chart, mo):
-    mo.md("#### 🌧️ Precipitation & 💨 Wind")
+    mo.md("#### 💨 Wind")
     combined_chart
     return
 
@@ -457,7 +418,6 @@ def _(df, mo):
     - **Data Points**: {len(historical_df)} historical, {len(forecast_df)} forecast
     - **Temperature Range**: {df["temperature_celsius"].min():.1f}°C to {df["temperature_celsius"].max():.1f}°C
     - **Max Wind Speed**: {df["wind_speed_mps"].max():.1f} m/s
-    - **Total Precipitation**: {df["precipitation_intensity_mmh"].sum():.2f} mm (cumulative)
     """)
     return
 
