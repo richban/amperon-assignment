@@ -55,9 +55,9 @@ def test_weather_observations_match_mocked_api_response():
     # Get weather observations
     weather_data = list(source.resources["weather_observations"])
 
-    # Should have one observation per location (2 total)
-    assert len(weather_data) == 2, (
-        f"Expected 2 observations (one per location), got {len(weather_data)}"
+    # Should have one observation per location (10 total - all Brownsville locations)
+    assert len(weather_data) == 10, (
+        f"Expected 10 observations (one per location), got {len(weather_data)}"
     )
 
     # ALL observations should have the SAME values from the mocked API response
@@ -86,8 +86,8 @@ def test_weather_observations_match_mocked_api_response():
 
         # Check that _locations_id exists and is valid
         assert "_locations_id" in obs, "Missing '_locations_id' field"
-        assert obs["_locations_id"] in [1, 2], (
-            f"Invalid location_id: {obs['_locations_id']}"
+        assert obs["_locations_id"] in range(1, 11), (
+            f"Invalid location_id: {obs['_locations_id']}, expected 1-10"
         )
 
         # Check that observation_timestamp was added by transformer
@@ -96,13 +96,15 @@ def test_weather_observations_match_mocked_api_response():
             "observation_timestamp should be normalized to hour boundary"
         )
 
-    # Verify both locations got the same weather data
-    assert weather_data[0]["values"] == weather_data[1]["values"], (
-        "Both locations should have identical weather values from the same API response"
-    )
+    # Verify all locations got the same weather data
+    first_values = weather_data[0]["values"]
+    for obs in weather_data[1:]:
+        assert obs["values"] == first_values, (
+            "All locations should have identical weather values from the same API response"
+        )
 
-    # Verify location IDs are different
+    # Verify location IDs are all unique and in expected range
     location_ids = [obs["_locations_id"] for obs in weather_data]
-    assert sorted(location_ids) == [1, 2], (
-        f"Expected location IDs [1, 2], got {sorted(location_ids)}"
+    assert sorted(location_ids) == list(range(1, 11)), (
+        f"Expected location IDs [1, 2, ..., 10], got {sorted(location_ids)}"
     )

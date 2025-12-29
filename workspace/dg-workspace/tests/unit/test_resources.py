@@ -7,7 +7,8 @@ Tests the locations() resource and helper functions in isolation.
 import pytest
 import sys
 from pathlib import Path
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
+import pendulum
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -45,7 +46,7 @@ class TestLocationsResource:
         location_resource = locations()
         result = list(location_resource)
 
-        required_fields = {"id", "name", "lat", "lon"}
+        required_fields = {"id", "name", "lat", "lon", "timezone"}
 
         for location in result:
             assert required_fields.issubset(location.keys()), (
@@ -62,6 +63,7 @@ class TestLocationsResource:
             assert isinstance(location["name"], str), "Name must be string"
             assert isinstance(location["lat"], (int, float)), "Lat must be numeric"
             assert isinstance(location["lon"], (int, float)), "Lon must be numeric"
+            assert isinstance(location["timezone"], str), "Timezone must be string"
 
     def test_locations_lat_lon_ranges(self):
         """Test that latitude and longitude are within valid ranges."""
@@ -98,6 +100,21 @@ class TestLocationsResource:
         # Should yield the same items as LOCATIONS list
         assert result == LOCATIONS
 
+    def test_locations_has_valid_timezone(self):
+        """Test that all locations have valid IANA timezone strings."""
+        location_resource = locations()
+        result = list(location_resource)
+
+        valid_timezones = ["America/Chicago"]  # Valid for Brownsville, TX
+
+        for location in result:
+            assert "timezone" in location, (
+                f"Location {location['id']} missing timezone field"
+            )
+            assert location["timezone"] in valid_timezones, (
+                f"Location {location['id']} has invalid timezone: {location['timezone']}"
+            )
+
 
 # =============================================================================
 # TIME UTILITY FUNCTION TESTS
@@ -112,13 +129,16 @@ class TestTimeUtilityFunctions:
         """Test timestamp normalization with current time."""
         result = get_normalized_observation_timestamp()
 
-        # Should be a datetime object
-        assert isinstance(result, datetime)
+        # Should be a pendulum.DateTime object (timezone-aware)
+        assert isinstance(result, pendulum.DateTime)
 
         # Should be normalized (minute, second, microsecond = 0)
         assert result.minute == 0
         assert result.second == 0
         assert result.microsecond == 0
+
+        # Should be in UTC timezone
+        assert result.timezone_name == "UTC"
 
     def test_get_normalized_observation_timestamp_with_iso_string(self):
         """Test timestamp normalization with ISO string input."""
@@ -157,7 +177,7 @@ class TestTimeUtilityFunctions:
 
     def test_get_absolute_time_params_returns_dict(self):
         """Test that get_absolute_time_params returns a dictionary."""
-        observation_ts = datetime(2025, 12, 23, 13, 0, 0, tzinfo=timezone.utc)
+        observation_ts = pendulum.datetime(2025, 12, 23, 13, 0, 0, tz="UTC")
         result = get_absolute_time_params(observation_ts)
 
         assert isinstance(result, dict)
@@ -166,29 +186,31 @@ class TestTimeUtilityFunctions:
 
     def test_get_absolute_time_params_time_window(self):
         """Test that time window is calculated correctly."""
-        observation_ts = datetime(2025, 12, 23, 13, 0, 0, tzinfo=timezone.utc)
+        observation_ts = pendulum.datetime(2025, 12, 23, 13, 0, 0, tz="UTC")
         result = get_absolute_time_params(observation_ts)
 
-        # Parse the ISO strings
-        start = datetime.fromisoformat(result["startTime"].replace("Z", "+00:00"))
-        end = datetime.fromisoformat(result["endTime"].replace("Z", "+00:00"))
+        # Parse the ISO strings back to pendulum
+        start = pendulum.parse(result["startTime"])
+        end = pendulum.parse(result["endTime"])
 
         # Start should be 24 hours before observation_ts
-        expected_start = observation_ts - timedelta(hours=24)
+        expected_start = observation_ts.subtract(hours=24)
         assert start == expected_start
 
         # End should be 5 days after observation_ts
-        expected_end = observation_ts + timedelta(days=5)
+        expected_end = observation_ts.add(days=5)
         assert end == expected_end
 
     def test_get_absolute_time_params_iso_format(self):
         """Test that returned timestamps are in ISO format with Z suffix."""
-        observation_ts = datetime(2025, 12, 23, 13, 0, 0, tzinfo=timezone.utc)
+        observation_ts = pendulum.datetime(2025, 12, 23, 13, 0, 0, tz="UTC")
         result = get_absolute_time_params(observation_ts)
 
-        # Should end with 'Z'
-        assert result["startTime"].endswith("Z")
-        assert result["endTime"].endswith("Z")
+        # Should end with 'Z' or '+00:00' (both valid UTC formats)
+        assert result["startTime"].endswith("Z") or result["startTime"].endswith(
+            "+00:00"
+        )
+        assert result["endTime"].endswith("Z") or result["endTime"].endswith("+00:00")
 
         # Should contain 'T' separator
         assert "T" in result["startTime"]
@@ -196,11 +218,14 @@ class TestTimeUtilityFunctions:
 
     def test_get_absolute_time_params_total_duration(self):
         """Test that the total time window is correct (24h backwards + 5 days forward)."""
-        observation_ts = datetime(2025, 12, 23, 13, 0, 0, tzinfo=timezone.utc)
+        observation_ts = pendulum.datetime(2025, 12, 23, 13, 0, 0, tz="UTC")
         result = get_absolute_time_params(observation_ts)
 
-        start = datetime.fromisoformat(result["startTime"].replace("Z", "+00:00"))
-        end = datetime.fromisoformat(result["endTime"].replace("Z", "+00:00"))
+        # Parse back to datetime for duration comparison
+        start_str = result["startTime"].replace("Z", "+00:00")
+        end_str = result["endTime"].replace("Z", "+00:00")
+        start = datetime.fromisoformat(start_str)
+        end = datetime.fromisoformat(end_str)
 
         # Total duration should be 6 days (144 hours)
         duration = end - start

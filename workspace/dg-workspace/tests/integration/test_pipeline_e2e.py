@@ -97,14 +97,16 @@ def test_bitemporal_weather_pipeline_end_to_end(temp_pipeline):
         locations_count = conn.execute(
             "SELECT COUNT(*) FROM test_weather_data.locations"
         ).fetchone()[0]
-        assert locations_count == 2, "Should have 2 locations"
+        assert locations_count == 10, (
+            "Should have 10 locations (all Brownsville locations)"
+        )
 
         # Check weather_observations table
         obs_count = conn.execute(
             "SELECT COUNT(*) FROM test_weather_data.weather_observations"
         ).fetchone()[0]
-        assert obs_count == 10, (
-            f"Should have 10 observations (5 hours × 2 locations), got {obs_count}"
+        assert obs_count == 50, (
+            f"Should have 50 observations (5 hours × 10 locations), got {obs_count}"
         )
 
         # Verify bitemporal structure
@@ -125,7 +127,9 @@ def test_bitemporal_weather_pipeline_end_to_end(temp_pipeline):
             # Check hour is 13 or 14 (depending on timezone conversion)
             assert "13:00:00" in str(observation_timestamp) or "14:00:00" in str(
                 observation_timestamp
-            ), f"observation_timestamp should be on hour boundary, got {observation_timestamp}"
+            ), (
+                f"observation_timestamp should be on hour boundary, got {observation_timestamp}"
+            )
 
         # Verify temperature values match mock
         temps = conn.execute("""
@@ -140,7 +144,7 @@ def test_bitemporal_weather_pipeline_end_to_end(temp_pipeline):
             f"Expected temps {expected_temps}, got {actual_temps}"
         )
 
-        # Verify both locations have all 5 time points
+        # Verify all 10 locations have all 5 time points
         location_counts = conn.execute("""
             SELECT _locations_id, COUNT(*) as cnt
             FROM test_weather_data.weather_observations
@@ -148,9 +152,11 @@ def test_bitemporal_weather_pipeline_end_to_end(temp_pipeline):
             ORDER BY _locations_id
         """).fetchall()
 
-        assert len(location_counts) == 2, "Should have data for 2 locations"
-        assert location_counts[0][1] == 5, "Location 1 should have 5 observations"
-        assert location_counts[1][1] == 5, "Location 2 should have 5 observations"
+        assert len(location_counts) == 10, "Should have data for 10 locations"
+        for idx, (location_id, count) in enumerate(location_counts):
+            assert count == 5, (
+                f"Location {location_id} should have 5 observations, got {count}"
+            )
 
     # Run 2: Different observation time (14:00) with slightly different temperatures
     responses.add(
@@ -196,13 +202,13 @@ def test_bitemporal_weather_pipeline_end_to_end(temp_pipeline):
 
     assert load_info_2 is not None
 
-    # Verify bitemporal versioning: should now have 20 observations (10 from run1 + 10 from run2)
+    # Verify bitemporal versioning: should now have 100 observations (50 from run1 + 50 from run2)
     with duckdb.connect(db_path) as conn:
         total_obs = conn.execute(
             "SELECT COUNT(*) FROM test_weather_data.weather_observations"
         ).fetchone()[0]
-        assert total_obs == 20, (
-            f"Should have 20 observations (2 runs × 5 hours × 2 locations), got {total_obs}"
+        assert total_obs == 100, (
+            f"Should have 100 observations (2 runs × 5 hours × 10 locations), got {total_obs}"
         )
 
         # Verify we have 2 different observation_timestamps
@@ -320,8 +326,8 @@ def test_idempotency_same_hour_replaces_data(temp_pipeline):
         count_after_run1 = conn.execute(
             "SELECT COUNT(*) FROM test_weather_data.weather_observations"
         ).fetchone()[0]
-        assert count_after_run1 == 10, (
-            f"After run 1: expected 10 records (5 hours × 2 locations), got {count_after_run1}"
+        assert count_after_run1 == 50, (
+            f"After run 1: expected 50 records (5 hours × 10 locations), got {count_after_run1}"
         )
 
         # Get a sample temperature from run 1 (any hour)
@@ -380,13 +386,13 @@ def test_idempotency_same_hour_replaces_data(temp_pipeline):
     load_info_2 = pipeline.run(source_run2)
     assert load_info_2 is not None
 
-    # Verify idempotency: count should STILL be 10 (replaced, not duplicated)
+    # Verify idempotency: count should STILL be 50 (replaced, not duplicated)
     with duckdb.connect(db_path) as conn:
         count_after_run2 = conn.execute(
             "SELECT COUNT(*) FROM test_weather_data.weather_observations"
         ).fetchone()[0]
-        assert count_after_run2 == 10, (
-            f"After run 2: expected 10 records (replaced, not duplicated), got {count_after_run2}"
+        assert count_after_run2 == 50, (
+            f"After run 2: expected 50 records (replaced, not duplicated), got {count_after_run2}"
         )
 
         # Verify only ONE distinct observation_timestamp exists (14:00:00)
