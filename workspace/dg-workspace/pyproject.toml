@@ -12,6 +12,10 @@ dependencies = [
     "fsspec",
     "sqlmesh[web]",
     "duckdb",
+    "marimo",
+    "lonboard",
+    "altair",
+    "matplotlib",
 ]
 
 [dependency-groups]
