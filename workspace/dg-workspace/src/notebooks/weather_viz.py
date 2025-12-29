@@ -17,6 +17,7 @@ def _():
     from lonboard.colormap import apply_continuous_cmap
     import pandas as pd
     import altair as alt
+
     return (
         H3HexagonLayer,
         Map,
@@ -120,15 +121,14 @@ def _(conn, selected_run, selected_time):
     weather_arrow = conn.execute(f"""
         SELECT
             h3_latlng_to_cell(l.lat, l.lon, 9) AS hex_id,
-            AVG(bw.temperature_celsius) AS temperature,
-            AVG(bw.wind_speed_mps) AS wind_speed,
-            AVG(l.lat) AS lat,
-            AVG(l.lon) AS lon
+            bw.temperature_celsius AS temperature,
+            bw.wind_speed_mps AS wind_speed,
+            l.lat,
+            l.lon
         FROM default__dev.bronze_weather bw
         JOIN weather_data.locations l ON l.id = bw.location_id
         WHERE bw.observation_timestamp_utc = '{selected_run}'
           AND bw.forecast_timestamp_utc = '{selected_time}'
-        GROUP BY hex_id
     """).fetch_arrow_table()
     return (weather_arrow,)
 
@@ -142,6 +142,7 @@ def _(Normalize, apply_continuous_cmap, plt):
         normalized = normalizer(temp_values)
         cmap = plt.get_cmap("RdYlBu_r")
         return apply_continuous_cmap(normalized, cmap)
+
     return (generate_colors,)
 
 
@@ -267,7 +268,6 @@ def _(alt, mo, pd, timeseries_df):
     if len(timeseries_df) == 0:
         mo.md("**No data available for selected location**")
     else:
-
         # Prepare data
         df = timeseries_df.copy()
         df["forecast_timestamp_utc"] = pd.to_datetime(df["forecast_timestamp_utc"])
