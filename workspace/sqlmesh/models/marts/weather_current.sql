@@ -19,33 +19,45 @@ MODEL (
 
 WITH latest_per_location AS (
   SELECT
-    location_id,
-    forecast_timestamp_utc,
-    observation_timestamp_utc,
-    temperature_celsius,
-    wind_speed_mps,
-    humidity_percent,
-    weather_code,
-    precipitation_type_label,
+    bw.location_id,
+    bw.forecast_timestamp_utc,
+    bw.observation_timestamp_utc,
+    bw.temperature_celsius,
+    bw.wind_speed_mps,
+    bw.humidity_percent,
+    bw.weather_code,
+    bw.precipitation_type_label,
+    l.timezone,
     ROW_NUMBER() OVER (
-      PARTITION BY location_id
-      ORDER BY observation_timestamp_utc DESC, forecast_timestamp_utc DESC
+      PARTITION BY bw.location_id
+      ORDER BY bw.observation_timestamp_utc DESC, bw.forecast_timestamp_utc DESC
     ) AS recency_rank
-  FROM bronze_weather
-  WHERE has_invalid_temperature = false
-    AND has_invalid_wind = false
+  FROM bronze_weather bw
+  JOIN weather_data.locations l ON bw.location_id = l.id
+  WHERE bw.has_invalid_temperature = false
+    AND bw.has_invalid_wind = false
 )
 
 SELECT
   location_id,
-  forecast_timestamp_utc AS forecast_time,
-  observation_timestamp_utc AS observed_at,
+  
+  -- UTC timestamps (source of truth)
+  forecast_timestamp_utc AS forecast_time_utc,
+  observation_timestamp_utc AS observed_at_utc,
+  
+  -- Local timestamps (converted using location timezone)
+  timezone(timezone, forecast_timestamp_utc) AS forecast_time_local,
+  timezone(timezone, observation_timestamp_utc) AS observed_at_local,
+  
+  -- Weather metrics
   temperature_celsius AS current_temperature_c,
   wind_speed_mps AS current_wind_speed_mps,
   ROUND(wind_speed_mps * 3.6, 1) AS current_wind_speed_kmh,  -- Convert m/s to km/h
   humidity_percent AS current_humidity_pct,
   weather_code,
   precipitation_type_label,
+  
+  -- Metadata
   CURRENT_TIMESTAMP AS refreshed_at
 FROM latest_per_location
 WHERE recency_rank = 1

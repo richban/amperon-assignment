@@ -24,8 +24,10 @@ import logging
 import os
 from dlt.sources.rest_api import rest_api_source
 from dlt.sources.rest_api.typing import RESTAPIConfig
+from dlt.common.time import ensure_pendulum_datetime_utc
 from typing import List, Dict, Any, Generator, Optional
 from datetime import datetime, timedelta
+import pendulum
 from .utils import get_duckdb_path
 
 # Configure DLT logging level
@@ -39,16 +41,76 @@ logger = logging.getLogger("dlt")
 # =============================================================================
 
 LOCATIONS = [
-    {"id": 1, "name": "Port Brownsville 1", "lat": 25.8600, "lon": -97.4200},
-    {"id": 2, "name": "Port Brownsville 2", "lat": 25.9000, "lon": -97.5200},
-    {"id": 3, "name": "Port Brownsville 3", "lat": 25.9000, "lon": -97.4800},
-    {"id": 4, "name": "Port Brownsville 4", "lat": 25.9000, "lon": -97.4400},
-    {"id": 5, "name": "Port Brownsville 5", "lat": 25.9000, "lon": -97.4000},
-    {"id": 6, "name": "Port Brownsville 6", "lat": 25.9200, "lon": -97.3800},
-    {"id": 7, "name": "Port Brownsville 7", "lat": 25.9400, "lon": -97.5400},
-    {"id": 8, "name": "Port Brownsville 8", "lat": 25.9400, "lon": -97.5200},
-    {"id": 9, "name": "Port Brownsville 9", "lat": 25.9400, "lon": -97.4800},
-    {"id": 10, "name": "Port Brownsville 10", "lat": 25.9400, "lon": -97.4400},
+    {
+        "id": 1,
+        "name": "Port Brownsville 1",
+        "lat": 25.8600,
+        "lon": -97.4200,
+        "timezone": "America/Chicago",
+    },
+    {
+        "id": 2,
+        "name": "Port Brownsville 2",
+        "lat": 25.9000,
+        "lon": -97.5200,
+        "timezone": "America/Chicago",
+    },
+    {
+        "id": 3,
+        "name": "Port Brownsville 3",
+        "lat": 25.9000,
+        "lon": -97.4800,
+        "timezone": "America/Chicago",
+    },
+    {
+        "id": 4,
+        "name": "Port Brownsville 4",
+        "lat": 25.9000,
+        "lon": -97.4400,
+        "timezone": "America/Chicago",
+    },
+    {
+        "id": 5,
+        "name": "Port Brownsville 5",
+        "lat": 25.9000,
+        "lon": -97.4000,
+        "timezone": "America/Chicago",
+    },
+    {
+        "id": 6,
+        "name": "Port Brownsville 6",
+        "lat": 25.9200,
+        "lon": -97.3800,
+        "timezone": "America/Chicago",
+    },
+    {
+        "id": 7,
+        "name": "Port Brownsville 7",
+        "lat": 25.9400,
+        "lon": -97.5400,
+        "timezone": "America/Chicago",
+    },
+    {
+        "id": 8,
+        "name": "Port Brownsville 8",
+        "lat": 25.9400,
+        "lon": -97.5200,
+        "timezone": "America/Chicago",
+    },
+    {
+        "id": 9,
+        "name": "Port Brownsville 9",
+        "lat": 25.9400,
+        "lon": -97.4800,
+        "timezone": "America/Chicago",
+    },
+    {
+        "id": 10,
+        "name": "Port Brownsville 10",
+        "lat": 25.9400,
+        "lon": -97.4400,
+        "timezone": "America/Chicago",
+    },
 ]
 
 # Core Weather Fields (Free tier)
@@ -74,13 +136,13 @@ WEATHER_FIELDS = [
 
 def get_normalized_observation_timestamp(
     backfill_datetime: Optional[str] = None,
-) -> datetime:
+) -> pendulum.DateTime:
     """
-    Get normalized hour-boundary timestamp for the pipeline run.
+    Get normalized hour-boundary timestamp for the pipeline run in UTC.
 
-    Normalizes execution time to the hour boundary (floor) for idempotency.
-    For example, any run between 13:00 and 13:59:59 gets normalized to
-    13:00:00 as the observation_timestamp.
+    Uses DLT's timezone utilities to ensure proper UTC handling regardless of
+    where the pipeline runs. Normalizes execution time to the hour boundary
+    (floor) for idempotency.
 
     Args:
         backfill_datetime: Optional ISO format datetime string for backfill
@@ -88,26 +150,26 @@ def get_normalized_observation_timestamp(
                           Example: "2025-12-23T13:00:00"
 
     Returns:
-        datetime: Normalized to hour boundary (minute=0, second=0, microsecond=0)
+        pendulum.DateTime: Timezone-aware UTC datetime normalized to hour boundary
 
     Examples:
-        >>> get_normalized_observation_timestamp()  # Called at 13:47:22
-        datetime(2025, 12, 26, 13, 0, 0)
+        >>> get_normalized_observation_timestamp()  # Called at 13:47:22 UTC
+        DateTime(2025, 12, 26, 13, 0, 0, tzinfo=Timezone('UTC'))
         >>> get_normalized_observation_timestamp("2025-12-22T15:30:00Z")
-        datetime(2025, 12, 22, 15, 0, 0)
+        DateTime(2025, 12, 22, 15, 0, 0, tzinfo=Timezone('UTC'))
     """
     if backfill_datetime:
-        # Parse backfill datetime, removing trailing 'Z' if present
-        ts = datetime.fromisoformat(backfill_datetime.replace("Z", ""))
+        # Parse and ensure UTC using DLT's utility
+        ts = ensure_pendulum_datetime_utc(backfill_datetime)
     else:
-        # Use current UTC time
-        ts = datetime.utcnow()
+        # Get current UTC time using pendulum (timezone-aware)
+        ts = pendulum.now("UTC")
 
-    # Floor to hour boundary
+    # Floor to hour boundary (pendulum preserves timezone)
     return ts.replace(minute=0, second=0, microsecond=0)
 
 
-def get_absolute_time_params(observation_ts: datetime) -> Dict[str, str]:
+def get_absolute_time_params(observation_ts: pendulum.DateTime) -> Dict[str, str]:
     """
     Calculate fixed time window for API request based on observation timestamp.
 
@@ -115,28 +177,28 @@ def get_absolute_time_params(observation_ts: datetime) -> Dict[str, str]:
     deterministic results. The same observation_timestamp always returns the same window.
 
     Args:
-        observation_ts: Normalized observation timestamp (datetime object)
+        observation_ts: Normalized observation timestamp (pendulum.DateTime in UTC)
 
     Returns:
-        Dict with startTime and endTime in ISO format:
+        Dict with startTime and endTime in ISO format with explicit UTC:
         - startTime: observation_ts - 24 hours (historical observations)
         - endTime: observation_ts + 5 days (forecast window)
 
     Example:
-        >>> observation_ts = datetime(2025, 12, 23, 13, 0, 0)
+        >>> observation_ts = pendulum.parse("2025-12-23T13:00:00Z")
         >>> get_absolute_time_params(observation_ts)
-        {'startTime': '2025-12-22T13:00:00', 'endTime': '2025-12-28T13:00:00'}
+        {'startTime': '2025-12-22T13:00:00Z', 'endTime': '2025-12-28T13:00:00Z'}
 
     This gives us ~145 hours of data:
     - 24 hours historical (observations)
     - 121 hours forecast (5 days)
     """
-    start_time = observation_ts - timedelta(hours=24)
-    end_time = observation_ts + timedelta(days=5)
+    start_time = observation_ts.subtract(hours=24)
+    end_time = observation_ts.add(days=5)
 
     return {
-        "startTime": start_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "endTime": end_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "startTime": start_time.to_iso8601_string(),
+        "endTime": end_time.to_iso8601_string(),
     }
 
 
@@ -183,7 +245,7 @@ def tomorrow_io_source(
     """
     # 1. Calculate normalized run timestamp
     observation_ts = get_normalized_observation_timestamp(backfill_datetime)
-    observation_ts_iso = observation_ts.isoformat() + "Z"
+    observation_ts_iso = observation_ts.to_iso8601_string()
 
     # 2. Calculate absolute time window (for API idempotency)
     time_params = get_absolute_time_params(observation_ts)
@@ -240,13 +302,22 @@ def tomorrow_io_source(
         name="weather_observations",
         write_disposition="merge",
         primary_key=["_locations_id", "start_time", "observation_timestamp"],
+        columns={
+            "start_time": {"data_type": "timestamp", "timezone": True},
+            "observation_timestamp": {"data_type": "timestamp", "timezone": True},
+        },
     )
     def add_versioning_metadata(item):
         """
         Inject observation_timestamp into each weather observation.
 
         Adds:
-        - observation_timestamp: WHEN we observed/predicted it
+        - observation_timestamp: WHEN we observed/predicted it (UTC timezone-aware)
+
+        DLT Timezone Handling:
+        - timezone=True: Ensures timestamps are stored as UTC timezone-aware
+        - Naive timestamps are treated as UTC
+        - Tz-aware timestamps are converted to UTC
 
         Normalized schema:
         - Only includes _locations_id (foreign key to locations table)
@@ -338,6 +409,7 @@ def run_pipeline(backfill_datetime: Optional[str] = None):
         progress="log",
     )
 
+    # DLT automatically sets DuckDB session timezone to UTC
     load_info = pipeline.run(tomorrow_io_source(backfill_datetime=backfill_datetime))
 
     logger.info(f"Load info: {load_info}")

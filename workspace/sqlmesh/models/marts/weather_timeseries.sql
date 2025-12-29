@@ -23,55 +23,63 @@ WITH latest_observation AS (
 )
 
 SELECT
-  location_id,
-  forecast_timestamp_utc AS forecast_hour,
-  observation_timestamp_utc AS observed_at,
+  bw.location_id,
+  
+  -- UTC timestamps (source of truth)
+  bw.forecast_timestamp_utc AS forecast_hour_utc,
+  bw.observation_timestamp_utc AS observed_at_utc,
+  
+  -- Local timestamps (converted using location timezone)
+  timezone(l.timezone, bw.forecast_timestamp_utc) AS forecast_hour_local,
+  timezone(l.timezone, bw.observation_timestamp_utc) AS observed_at_local,
 
   -- Temperature metrics
-  temperature_celsius,
-  feels_like_celsius,
+  bw.temperature_celsius,
+  bw.feels_like_celsius,
 
   -- Wind metrics
-  wind_speed_mps,
-  ROUND(wind_speed_mps * 3.6, 1) AS wind_speed_kmh,  -- Convert to km/h
-  wind_direction_degrees,
+  bw.wind_speed_mps,
+  ROUND(bw.wind_speed_mps * 3.6, 1) AS wind_speed_kmh,  -- Convert to km/h
+  bw.wind_direction_degrees,
   CASE
-    WHEN wind_direction_degrees BETWEEN 0 AND 22.5 THEN 'N'
-    WHEN wind_direction_degrees BETWEEN 22.5 AND 67.5 THEN 'NE'
-    WHEN wind_direction_degrees BETWEEN 67.5 AND 112.5 THEN 'E'
-    WHEN wind_direction_degrees BETWEEN 112.5 AND 157.5 THEN 'SE'
-    WHEN wind_direction_degrees BETWEEN 157.5 AND 202.5 THEN 'S'
-    WHEN wind_direction_degrees BETWEEN 202.5 AND 247.5 THEN 'SW'
-    WHEN wind_direction_degrees BETWEEN 247.5 AND 292.5 THEN 'W'
-    WHEN wind_direction_degrees BETWEEN 292.5 AND 337.5 THEN 'NW'
+    WHEN bw.wind_direction_degrees BETWEEN 0 AND 22.5 THEN 'N'
+    WHEN bw.wind_direction_degrees BETWEEN 22.5 AND 67.5 THEN 'NE'
+    WHEN bw.wind_direction_degrees BETWEEN 67.5 AND 112.5 THEN 'E'
+    WHEN bw.wind_direction_degrees BETWEEN 112.5 AND 157.5 THEN 'SE'
+    WHEN bw.wind_direction_degrees BETWEEN 157.5 AND 202.5 THEN 'S'
+    WHEN bw.wind_direction_degrees BETWEEN 202.5 AND 247.5 THEN 'SW'
+    WHEN bw.wind_direction_degrees BETWEEN 247.5 AND 292.5 THEN 'W'
+    WHEN bw.wind_direction_degrees BETWEEN 292.5 AND 337.5 THEN 'NW'
     ELSE 'N'
   END AS wind_direction_cardinal,
 
   -- Precipitation
-  precipitation_intensity_mmh,
-  precipitation_probability_percent,
-  precipitation_type_label,
+  bw.precipitation_intensity_mmh,
+  bw.precipitation_probability_percent,
+  bw.precipitation_type_label,
 
   -- Atmospheric conditions
-  humidity_percent,
-  cloud_cover_percent,
-  pressure_hpa,
-  visibility_km,
-  weather_code,
+  bw.humidity_percent,
+  bw.cloud_cover_percent,
+  bw.pressure_hpa,
+  bw.visibility_km,
+  bw.weather_code,
 
-  -- Time context helpers
-  DATE_TRUNC('day', forecast_timestamp_utc) AS forecast_date,
-  EXTRACT(HOUR FROM forecast_timestamp_utc) AS forecast_hour_of_day,
+  -- Time context helpers (using LOCAL time for business logic)
+  DATE_TRUNC('day', timezone(l.timezone, bw.forecast_timestamp_utc)) AS forecast_date_local,
+  EXTRACT(HOUR FROM timezone(l.timezone, bw.forecast_timestamp_utc)) AS forecast_hour_of_day_local,
   CASE
-    WHEN forecast_timestamp_utc < CURRENT_TIMESTAMP THEN 'Historical'
+    WHEN bw.forecast_timestamp_utc < CURRENT_TIMESTAMP THEN 'Historical'
     ELSE 'Forecast'
   END AS data_type,
 
   -- Metadata
   CURRENT_TIMESTAMP AS refreshed_at
 
-FROM bronze_weather, latest_observation
-WHERE has_invalid_temperature = false
-  AND has_invalid_wind = false
-  AND observation_timestamp_utc = latest_observation.latest_obs_time
-ORDER BY location_id, forecast_timestamp_utc;
+FROM bronze_weather bw
+JOIN weather_data.locations l ON bw.location_id = l.id
+CROSS JOIN latest_observation
+WHERE bw.has_invalid_temperature = false
+  AND bw.has_invalid_wind = false
+  AND bw.observation_timestamp_utc = latest_observation.latest_obs_time
+ORDER BY bw.location_id, bw.forecast_timestamp_utc;
