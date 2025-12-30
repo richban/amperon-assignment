@@ -2,45 +2,7 @@ version: '3.8'
 
 services:
   # ============================================================================
-  # Storage: MinIO (S3-compatible object storage)
-  # ============================================================================
-  minio:
-    image: minio/minio:latest
-    command: server /data --console-address ":9001"
-    ports:
-      - "9000:9000"   # S3 API
-      - "9001:9001"   # Web Console
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    volumes:
-      - minio_data:/data
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 5s
-      timeout: 3s
-      retries: 3
-    networks:
-      - amperon
-
-  minio-init:
-    image: minio/mc:latest
-    depends_on:
-      minio:
-        condition: service_healthy
-    entrypoint: >
-      /bin/sh -c "
-      mc alias set myminio http://minio:9000 minioadmin minioadmin;
-      mc mb myminio/datalake --ignore-existing;
-      mc mb myminio/dlt-staging --ignore-existing;
-      echo 'MinIO buckets created';
-      exit 0;
-      "
-    networks:
-      - amperon
-
-  # ============================================================================
-  # App: Dagster (all-in-one: webserver + daemon)
+  # Dagster: Pipeline orchestration
   # ============================================================================
   dagster:
     build:
@@ -48,54 +10,37 @@ services:
       dockerfile: Dockerfile
     command: >
       sh -c "dagster-daemon run &
-             dagster-webserver -h 0.0.0.0 -p 3000"
+             dagster dev -h 0.0.0.0 -p 3000 -m dg_amperon.definitions"
     ports:
       - "3000:3000"   # Dagster UI
     environment:
       # Environment
-      ENVIRONMENT: prod
-
+      ENVIRONMENT: dev
+      
       # Tomorrow.io API
       TOMORROW_API_KEY: ${TOMORROW_API_KEY}
       SOURCES__TOMORROW_IO_PIPELINE__TOMORROW_IO_ACCESS_TOKEN: ${TOMORROW_API_KEY}
-
+      
       # Dagster
       DAGSTER_HOME: /app/dagster_home
-
-      # Storage paths
-      DUCKDB_DATABASE: s3://datalake/duckdb/weather.db
+      
+      # Storage paths (local files)
+      DUCKDB_DATABASE: /app/data/weather.db
       SQLMESH_PROJECT_PATH: /app/sqlmesh
-
-      # AWS/S3 (for DuckDB + DLT)
-      AWS_ACCESS_KEY_ID: minioadmin
-      AWS_SECRET_ACCESS_KEY: minioadmin
-      AWS_ENDPOINT_URL: http://minio:9000
-      AWS_REGION: us-east-1
-
+      
       # DLT Runtime
       RUNTIME__LOG_LEVEL: INFO
-      NORMALIZE__DATA_WRITER__DISABLE_COMPRESSION: "true"
-
-      # DLT Filesystem Destination
-      DESTINATION__FILESYSTEM__BUCKET_URL: s3://dlt-staging
-      DESTINATION__FILESYSTEM__CREDENTIALS__AWS_ACCESS_KEY_ID: minioadmin
-      DESTINATION__FILESYSTEM__CREDENTIALS__AWS_SECRET_ACCESS_KEY: minioadmin
-      DESTINATION__FILESYSTEM__CREDENTIALS__ENDPOINT_URL: http://minio:9000
-      DESTINATION__FILESYSTEM__CREDENTIALS__AWS_REGION: us-east-1
     volumes:
-      # Mount source for hot reload during development
+      # Mount source for hot reload
       - ./workspace/dg-workspace/src:/app/src
       - ./workspace/sqlmesh:/app/sqlmesh
-    depends_on:
-      minio:
-        condition: service_healthy
-      minio-init:
-        condition: service_completed_successfully
+      # Mount data directory for DuckDB
+      - ./data:/app/data
     networks:
       - amperon
 
   # ============================================================================
-  # Viz: Marimo (optional - for interactive notebooks)
+  # Marimo: Visualization notebook
   # ============================================================================
   marimo:
     build:
@@ -105,22 +50,14 @@ services:
     ports:
       - "8080:8080"
     environment:
-      ENVIRONMENT: prod
-      DUCKDB_DATABASE: s3://datalake/duckdb/weather.db
-      AWS_ACCESS_KEY_ID: minioadmin
-      AWS_SECRET_ACCESS_KEY: minioadmin
-      AWS_ENDPOINT_URL: http://minio:9000
-      AWS_REGION: us-east-1
+      ENVIRONMENT: dev
+      DUCKDB_DATABASE: /app/data/weather.db
     volumes:
       - ./workspace/dg-workspace/src/notebooks:/app/src/notebooks
-    depends_on:
-      - minio
+      - ./data:/app/data
     networks:
       - amperon
 
 networks:
   amperon:
     driver: bridge
-
-volumes:
-  minio_data:
