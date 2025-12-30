@@ -3,11 +3,15 @@ MODEL (
   kind INCREMENTAL_BY_UNIQUE_KEY (
     unique_key location_id
   ),
+  grain location_id,
   description 'Mart: Latest weather conditions per location (answers Q1)',
-  audits (
+  audits [
+    ASSERT_NOT_NULL(column_name := current_temperature_c),
+    ASSERT_NOT_NULL(column_name := current_wind_speed_mps),
+    ASSERT_NOT_NULL(column_name := observed_at_utc),
     assert_all_locations_present,
     assert_unique_location_snapshot
-  )
+  ]
 );
 
 /*

@@ -3,7 +3,18 @@ MODEL (
   kind INCREMENTAL_BY_TIME_RANGE (
     time_column observation_timestamp_utc
   ),
-  description 'Silver model: Cleans and standardizes raw weather data from DLT',
+  grain (location_id, forecast_timestamp_utc, observation_timestamp_utc),
+  audits [
+    -- Bitemporal keys must exist
+    ASSERT_NOT_NULL(column_name := location_id),
+    ASSERT_NOT_NULL(column_name := forecast_timestamp_utc),
+    ASSERT_NOT_NULL(column_name := observation_timestamp_utc),
+
+    -- Core metrics must exist
+    ASSERT_NOT_NULL(column_name := temperature_celsius),
+    ASSERT_NOT_NULL(column_name := wind_speed_mps),
+  ],
+  description 'Silver model: Cleans and standardizes bronze (raw) ingested weather data from DLT',
 );
 
 /*
