@@ -18,6 +18,8 @@ from dagster import (
     AssetKey,
     AssetCheckResult,
     asset_check,
+    HourlyPartitionsDefinition,
+    BackfillPolicy,
 )
 from dagster_duckdb import DuckDBResource
 from dagster_dlt import DagsterDltResource, dlt_assets, DagsterDltTranslator
@@ -33,33 +35,47 @@ class CustomDagsterDltTranslator(DagsterDltTranslator):
         return AssetKey(["weather_data", resource.name])
 
 
+# end_offset=1 makes the current hour partition available immediately (not waiting for hour to complete)
+hourly_partition = HourlyPartitionsDefinition(
+    start_date="2025-12-30-12:00", timezone="UTC", end_offset=1
+)
+
+
 @dlt_assets(
     name="weather_bronze",
     group_name="weather_ingestion",
     dlt_source=tomorrow_io_source(),
     dlt_pipeline=create_pipeline(),
     dagster_dlt_translator=CustomDagsterDltTranslator(),
+    partitions_def=hourly_partition,
+    backfill_policy=BackfillPolicy.single_run(),
 )
 def weather_bronze_assets(
     context: AssetExecutionContext,
     dlt: DagsterDltResource,
 ):
-    # Get backfill datetime from run config if provided
-    run_config = context.run.run_config
-    backfill_datetime = None
+    # Check if we're doing a backfill (multiple partitions)
+    if hasattr(context, "partition_key_range") and context.partition_key_range:
+        # For backfills with multiple partitions
+        start_key = context.partition_key_range.start
+        end_key = context.partition_key_range.end
+        context.log.info(f"Executing backfill from {start_key} to {end_key}")
 
-    if run_config and "ops" in run_config:
-        op_config = (
-            run_config.get("ops", {}).get("weather_bronze", {}).get("config", {})
-        )
-        backfill_datetime = op_config.get("backfill_datetime")
+        # For now, process the start partition (can be enhanced for multi-partition backfills)
+        backfill_datetime = start_key
+        source = tomorrow_io_source(backfill_datetime=backfill_datetime)
+    elif hasattr(context, "partition_key") and context.partition_key:
+        # For single partition
+        partition_key = context.partition_key
+        context.log.info(f"Processing hourly partition: {partition_key}")
 
-    # Create source with optional backfill support
-    if backfill_datetime:
-        context.log.info(f"Running in backfill mode: {backfill_datetime}")
+        # Convert partition key to ISO datetime format expected by tomorrow_io_source
+        # partition_key format: "2025-12-23-14:00" -> "2025-12-23T14:00:00"
+        backfill_datetime = partition_key.replace("-", "T", 1).replace("-", ":")
         source = tomorrow_io_source(backfill_datetime=backfill_datetime)
     else:
-        context.log.info("Running in scheduled mode")
+        # Non-partitioned run (scheduled mode)
+        context.log.info("Running in scheduled mode (no partition)")
         source = tomorrow_io_source()
 
     # Run DLT pipeline via DagsterDltResource
@@ -67,7 +83,9 @@ def weather_bronze_assets(
 
 
 @asset_check(asset=AssetKey(["weather_data", "locations"]))
-def check_locations_count(context: AssetCheckExecutionContext, duckdb_resource: DuckDBResource) -> AssetCheckResult:
+def check_locations_count(
+    context: AssetCheckExecutionContext, duckdb_resource: DuckDBResource
+) -> AssetCheckResult:
     """Check that we have exactly 10 locations configured."""
     with duckdb_resource.get_connection() as conn:
         result = conn.execute("""
