@@ -8,7 +8,11 @@ from contextlib import contextmanager
 
 from dagster_duckdb import DuckDBResource
 
-from dg_amperon.defs.weather_ingestion.utils import get_duckdb_path, is_prod
+from dg_amperon.defs.weather_ingestion.utils import (
+    get_duckdb_path,
+    get_duckdb_s3_config,
+    is_prod,
+)
 
 class ExtendedDuckDBResource(DuckDBResource):
     """Extended DuckDB resource that pre-installs and loads S3 extensions.
@@ -65,7 +69,7 @@ def create_duckdb_resource() -> ExtendedDuckDBResource:
     db_path = str(get_duckdb_path())
 
     if is_prod():
-        connection_config = get_duckdb_s3_config()
+        connection_config = get_s3_config()
     else:
         connection_config = {}
 
