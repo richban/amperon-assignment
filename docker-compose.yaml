@@ -8,26 +8,29 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    image: amperon-dagster:latest
     command: >
-      sh -c "dagster-daemon run &
-             dagster dev -h 0.0.0.0 -p 3000 -m dg_amperon.definitions"
+      sh -c "
+      dagster-daemon run &
+      dagster dev -h 0.0.0.0 -p 3000 -m dg_amperon.definitions
+      "
     ports:
       - "3000:3000"   # Dagster UI
     environment:
       # Environment
       ENVIRONMENT: dev
-      
+
       # Tomorrow.io API
       TOMORROW_API_KEY: ${TOMORROW_API_KEY}
       SOURCES__TOMORROW_IO_PIPELINE__TOMORROW_IO_ACCESS_TOKEN: ${TOMORROW_API_KEY}
-      
+
       # Dagster
       DAGSTER_HOME: /app/dagster_home
-      
+
       # Storage paths (local files)
       DUCKDB_DATABASE: /app/data/weather.db
       SQLMESH_PROJECT_PATH: /app/sqlmesh
-      
+
       # DLT Runtime
       RUNTIME__LOG_LEVEL: INFO
     volumes:
@@ -36,24 +39,25 @@ services:
       - ./workspace/sqlmesh:/app/sqlmesh
       # Mount data directory for DuckDB
       - ./data:/app/data
+      # Mount dagster_home for persistence
+      - ./data/dagster_home:/app/dagster_home
     networks:
       - amperon
+
 
   # ============================================================================
   # Marimo: Visualization notebook
   # ============================================================================
   marimo:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    command: marimo edit --host 0.0.0.0 --port 8080 --no-token /app/src/notebooks/weather_viz.py
+    image: amperon-dagster:latest
+    command: marimo edit --host 0.0.0.0 --port 8080 --no-token /app/notebooks/weather_viz.py
     ports:
       - "8080:8080"
     environment:
       ENVIRONMENT: dev
       DUCKDB_DATABASE: /app/data/weather.db
     volumes:
-      - ./workspace/dg-workspace/src/notebooks:/app/src/notebooks
+      - ./workspace/dg-workspace/src/notebooks:/app/notebooks
       - ./data:/app/data
     networks:
       - amperon
