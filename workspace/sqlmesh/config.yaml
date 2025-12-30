@@ -2,23 +2,27 @@
 gateways:
   duckdb:
     connection:
-      # For more information on configuring the connection to your execution engine, visit:
-      # https://sqlmesh.readthedocs.io/en/stable/reference/configuration/#connection
-      # https://sqlmesh.readthedocs.io/en/stable/integrations/engines/duckdb/#connection-options
       type: duckdb
-      database: ../../data/weather.db  # Use the weather.db from project root/data/
+      # Environment-aware database path:
+      # - Dev: ../../data/weather.db (local file)
+      # - Prod: s3://datalake/duckdb/weather.db (S3)
+      database: "{{ env_var('DUCKDB_DATABASE', '../../data/weather.db') }}"
       concurrent_tasks: 1
-      # register_comments: True
-      # pre_ping: False
-      # pretty_sql: False
-      # schema_differ_overrides:
-      # catalog_type_overrides:
-      # catalogs:
-      # extensions:
-      # connector_config:
-      # secrets:
-      # filesystems:
-      # token:
+
+      # Extensions for S3 access (auto-loaded when using S3 path)
+      extensions:
+        - httpfs
+        - aws
+
+      # S3 credentials (only used when database path starts with s3://)
+      secrets:
+        - type: s3
+          key_id: "{{ env_var('AWS_ACCESS_KEY_ID', 'minioadmin') }}"
+          secret: "{{ env_var('AWS_SECRET_ACCESS_KEY', 'minioadmin') }}"
+          region: "{{ env_var('AWS_REGION', 'us-east-1') }}"
+          endpoint: "{{ env_var('AWS_ENDPOINT_URL', '').replace('http://', '').replace('https://', '') }}"
+          use_ssl: "{{ env_var('AWS_USE_SSL', 'false') }}"
+          url_style: path
 
 default_gateway: duckdb
 
