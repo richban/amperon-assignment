@@ -346,7 +346,9 @@ def tomorrow_io_source(
             logger.warning(f"Unexpected item type: {type(item)}")
             yield item
 
-    return source.resources["locations"], add_versioning_metadata
+    # Return only weather_observations
+    # locations is handled separately via locations_source()
+    return add_versioning_metadata
 
 
 def create_pipeline(backfill_datetime: Optional[str] = None):

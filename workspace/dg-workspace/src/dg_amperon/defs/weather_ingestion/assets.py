@@ -36,10 +36,23 @@ class CustomDagsterDltTranslator(DagsterDltTranslator):
         return AssetKey(["weather_data", resource.name])
 
 
+class WeatherObservationsTranslator(DagsterDltTranslator):
+    """Translator for weather observations that adds dependency on locations."""
+
+    def get_asset_key(self, resource: DagsterDltResource) -> AssetKey:
+        """Overrides asset key to be the dlt resource name."""
+        return AssetKey(["weather_data", resource.name])
+
+    def get_deps_asset_keys(self, resource: DagsterDltResource):
+        """Weather observations depend on locations being materialized first."""
+        # Return locations as a dependency
+        return [AssetKey(["weather_data", "locations"])]
+
+
 # Hourly partition for weather observations
 # end_offset=1 makes the current hour partition available immediately (not waiting for hour to complete)
 hourly_partition = HourlyPartitionsDefinition(
-    start_date="2025-12-23-00:00", timezone="UTC", end_offset=1
+    start_date="2025-12-30-12:00", timezone="UTC", end_offset=1
 )
 
 
@@ -70,7 +83,7 @@ def locations_bronze_asset(
     group_name="weather_ingestion",
     dlt_source=tomorrow_io_source(),
     dlt_pipeline=create_pipeline(),
-    dagster_dlt_translator=CustomDagsterDltTranslator(),
+    dagster_dlt_translator=WeatherObservationsTranslator(),
     partitions_def=hourly_partition,
     backfill_policy=BackfillPolicy.single_run(),
 )
