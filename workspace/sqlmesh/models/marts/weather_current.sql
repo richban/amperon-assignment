@@ -1,10 +1,9 @@
 MODEL (
   name weather_current,
-  kind FULL,
-  dialect duckdb,
+  kind INCREMENTAL_BY_TIME_RANGE (
+    time_column observation_timestamp_utc
+  ),
   description 'Mart: Latest weather conditions per location (answers Q1)',
-  owner 'data_team',
-  cron '@hourly'
 );
 
 /*
@@ -40,15 +39,15 @@ WITH latest_per_location AS (
 
 SELECT
   location_id,
-  
+
   -- UTC timestamps (source of truth)
   forecast_timestamp_utc AS forecast_time_utc,
   observation_timestamp_utc AS observed_at_utc,
-  
+
   -- Local timestamps (converted using location timezone)
   timezone(timezone, forecast_timestamp_utc) AS forecast_time_local,
   timezone(timezone, observation_timestamp_utc) AS observed_at_local,
-  
+
   -- Weather metrics
   temperature_celsius AS current_temperature_c,
   wind_speed_mps AS current_wind_speed_mps,
@@ -56,7 +55,7 @@ SELECT
   humidity_percent AS current_humidity_pct,
   weather_code,
   precipitation_type_label,
-  
+
   -- Metadata
   CURRENT_TIMESTAMP AS refreshed_at
 FROM latest_per_location

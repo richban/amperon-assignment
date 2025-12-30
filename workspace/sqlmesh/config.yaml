@@ -14,16 +14,6 @@ gateways:
         - httpfs
         - aws
 
-      # S3 credentials (only used when database path starts with s3://)
-      secrets:
-        - type: s3
-          key_id: "{{ env_var('AWS_ACCESS_KEY_ID', 'minioadmin') }}"
-          secret: "{{ env_var('AWS_SECRET_ACCESS_KEY', 'minioadmin') }}"
-          region: "{{ env_var('AWS_REGION', 'us-east-1') }}"
-          endpoint: "{{ env_var('AWS_ENDPOINT_URL', '').replace('http://', '').replace('https://', '') }}"
-          use_ssl: "{{ env_var('AWS_USE_SSL', 'false') }}"
-          url_style: path
-
 default_gateway: duckdb
 
 # --- Model Defaults ---
@@ -31,8 +21,8 @@ default_gateway: duckdb
 
 model_defaults:
   dialect: duckdb
-  start: 2025-12-23  # Start date for backfill history (today)
-  cron: '@hourly'    # Run models hourly to match DLT pipeline schedule
+  start: 2025-12-30-12:00
+  cron: '@hourly'
 
 # --- Linting Rules ---
 # Enforce standards for your team

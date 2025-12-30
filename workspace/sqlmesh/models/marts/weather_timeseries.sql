@@ -1,10 +1,9 @@
 MODEL (
   name weather_timeseries,
-  kind FULL,
-  dialect duckdb,
+  kind INCREMENTAL_BY_TIME_RANGE (
+    time_column observation_timestamp_utc
+  ),
   description 'Mart: Hourly weather timeseries per location (answers Q2)',
-  owner 'data_team',
-  cron '@hourly'
 );
 
 /*
@@ -13,22 +12,27 @@ MODEL (
   Answers Assignment Question 2:
   "What is the hourly forecast for each location for the next 5 days?"
 
-  This model provides hourly weather data using the latest observation snapshot
-  for each location, ensuring users get the freshest forecast data.
+  This model provides hourly weather data incrementally processed by observation time.
 */
 
-WITH latest_observation AS (
+WITH silver_filtered AS (
+  SELECT *
+  FROM silver_weather
+  WHERE observation_timestamp_utc BETWEEN @start_dt AND @end_dt
+),
+
+latest_observation AS (
   SELECT MAX(observation_timestamp_utc) AS latest_obs_time
-  FROM bronze_weather
+  FROM silver_filtered
 )
 
 SELECT
   bw.location_id,
-  
+
   -- UTC timestamps (source of truth)
   bw.forecast_timestamp_utc AS forecast_hour_utc,
   bw.observation_timestamp_utc AS observed_at_utc,
-  
+
   -- Local timestamps (converted using location timezone)
   timezone(l.timezone, bw.forecast_timestamp_utc) AS forecast_hour_local,
   timezone(l.timezone, bw.observation_timestamp_utc) AS observed_at_local,
@@ -76,7 +80,7 @@ SELECT
   -- Metadata
   CURRENT_TIMESTAMP AS refreshed_at
 
-FROM bronze_weather bw
+FROM silver_filtered bw
 JOIN weather_data.locations l ON bw.location_id = l.id
 CROSS JOIN latest_observation
 WHERE bw.has_invalid_temperature = false

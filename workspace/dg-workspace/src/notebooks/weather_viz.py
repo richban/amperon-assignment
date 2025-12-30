@@ -52,7 +52,7 @@ def _(Path, duckdb, os):
 def _(conn):
     runs_df = conn.execute("""
         SELECT DISTINCT observation_timestamp_utc
-        FROM default__dev.bronze_weather
+        FROM default__dev.silver_weather
         ORDER BY observation_timestamp_utc DESC
     """).df()
     available_runs = runs_df["observation_timestamp_utc"].tolist()
@@ -88,7 +88,7 @@ def _(mo, run_selector):
 def _(conn, selected_run):
     forecast_times_df = conn.execute(f"""
         SELECT DISTINCT forecast_timestamp_utc
-        FROM default__dev.bronze_weather
+        FROM default__dev.silver_weather
         WHERE observation_timestamp_utc = '{selected_run}'
         ORDER BY forecast_timestamp_utc
     """).df()
@@ -133,7 +133,7 @@ def _(conn, selected_run, selected_time):
             bw.wind_speed_mps AS wind_speed,
             l.lat,
             l.lon
-        FROM default__dev.bronze_weather bw
+        FROM default__dev.silver_weather bw
         JOIN weather_data.locations l ON l.id = bw.location_id
         WHERE bw.observation_timestamp_utc = '{selected_run}'
           AND bw.forecast_timestamp_utc = '{selected_time}'
@@ -260,7 +260,7 @@ def _(conn, get_clicked_hex, mo, selected_run):
                 WHEN bw.forecast_timestamp_utc <= '{selected_run}' THEN 'Historical'
                 ELSE 'Forecast'
             END as data_type
-        FROM default__dev.bronze_weather bw
+        FROM default__dev.silver_weather bw
         JOIN weather_data.locations l ON l.id = bw.location_id
         WHERE bw.observation_timestamp_utc = '{selected_run}'
           AND h3_latlng_to_cell(l.lat, l.lon, 9) = '{selected_hex}'

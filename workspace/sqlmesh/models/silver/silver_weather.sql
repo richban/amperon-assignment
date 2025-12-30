@@ -1,10 +1,9 @@
 MODEL (
-  name bronze_weather,
-  kind FULL,
-  dialect duckdb,
-  description 'Staging model: Cleans and standardizes raw weather data from DLT',
-  owner 'data_team',
-  cron '@hourly'
+  name silver_weather,
+  kind INCREMENTAL_BY_TIME_RANGE (
+    time_column observation_timestamp_utc
+  ),
+  description 'Silver model: Cleans and standardizes raw weather data from DLT',
 );
 
 /*
@@ -63,6 +62,7 @@ WITH latest_weather_data AS (
     _dlt_id
 
   FROM weather_data.weather_observations
+  WHERE observation_timestamp BETWEEN @start_dt AND @end_dt
 )
 
 SELECT
