@@ -4,6 +4,10 @@ MODEL (
     unique_key location_id
   ),
   description 'Mart: Latest weather conditions per location (answers Q1)',
+  audits (
+    assert_all_locations_present,
+    assert_unique_location_snapshot
+  )
 );
 
 /*
@@ -12,11 +16,18 @@ MODEL (
   Answers Assignment Question 1:
   "What is the current temperature and wind speed for each location?"
 
-  This model provides the most recent weather observation for each location,
-  using the latest observation_timestamp to get the freshest forecast.
+  This model provides the NOWCAST (T+0 forecast) for each location.
+  Nowcast = when forecast_timestamp = observation_timestamp, the API's best estimate
+  of current conditions at the moment of observation.
 */
 
-WITH latest_per_location AS (
+WITH latest_observation AS (
+  SELECT MAX(observation_timestamp_utc) AS latest_obs_time
+  FROM silver_weather
+  WHERE observation_timestamp_utc BETWEEN @start_dt AND @end_dt
+),
+
+nowcast_per_location AS (
   SELECT
     bw.location_id,
     bw.forecast_timestamp_utc,
@@ -26,16 +37,14 @@ WITH latest_per_location AS (
     bw.humidity_percent,
     bw.weather_code,
     bw.precipitation_type_label,
-    l.timezone,
-    ROW_NUMBER() OVER (
-      PARTITION BY bw.location_id
-      ORDER BY bw.observation_timestamp_utc DESC, bw.forecast_timestamp_utc DESC
-    ) AS recency_rank
+    l.timezone
   FROM silver_weather bw
   JOIN weather_data.locations l ON bw.location_id = l.id
+  CROSS JOIN latest_observation
   WHERE bw.has_invalid_temperature = false
     AND bw.has_invalid_wind = false
-    AND bw.observation_timestamp_utc BETWEEN @start_dt AND @end_dt
+    AND bw.observation_timestamp_utc = latest_observation.latest_obs_time
+    AND bw.forecast_timestamp_utc = bw.observation_timestamp_utc  -- NOWCAST: T+0 forecast
 )
 
 SELECT
@@ -49,7 +58,7 @@ SELECT
   timezone(timezone, forecast_timestamp_utc) AS forecast_time_local,
   timezone(timezone, observation_timestamp_utc) AS observed_at_local,
 
-  -- Weather metrics
+  -- Weather metrics (nowcast values)
   temperature_celsius AS current_temperature_c,
   wind_speed_mps AS current_wind_speed_mps,
   ROUND(wind_speed_mps * 3.6, 1) AS current_wind_speed_kmh,  -- Convert m/s to km/h
@@ -59,6 +68,5 @@ SELECT
 
   -- Metadata
   CURRENT_TIMESTAMP AS refreshed_at
-FROM latest_per_location
-WHERE recency_rank = 1
+FROM nowcast_per_location
 ORDER BY location_id;

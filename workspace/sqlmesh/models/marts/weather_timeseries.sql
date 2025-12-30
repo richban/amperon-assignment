@@ -1,9 +1,11 @@
 MODEL (
   name weather_timeseries,
-  kind INCREMENTAL_BY_TIME_RANGE (
-    time_column observation_timestamp_utc
-  ),
-  description 'Mart: Hourly weather timeseries per location (answers Q2)',
+  kind FULL,
+  description 'Mart: Hourly weather timeseries per location (answers Q2) - sliding 144h window',
+  audits (
+    assert_all_locations_present,
+    assert_timeseries_window_complete
+  )
 );
 
 /*
@@ -12,25 +14,26 @@ MODEL (
   Answers Assignment Question 2:
   "What is the hourly forecast for each location for the next 5 days?"
 
-  This model provides hourly weather data incrementally processed by observation time.
+  This model maintains a sliding 144-hour window:
+  - 24 hours of historical data (backcasted observations)
+  - 120 hours of future forecasts (5 days)
+  
+  Uses FULL refresh strategy:
+  - Rebuilds entire table every hour with the latest observation
+  - Guarantees clean 144-row window per location (no stale data)
+  - Simple and performant for small datasets (~1,440 rows total)
 */
 
-WITH silver_filtered AS (
-  SELECT *
-  FROM silver_weather
-  WHERE observation_timestamp_utc BETWEEN @start_dt AND @end_dt
-),
-
-latest_observation AS (
+WITH latest_observation AS (
   SELECT MAX(observation_timestamp_utc) AS latest_obs_time
-  FROM silver_filtered
+  FROM silver_weather
 )
 
 SELECT
   bw.location_id,
+  bw.forecast_timestamp_utc,  -- Part of unique key (location_id, forecast_timestamp_utc)
 
   -- UTC timestamps (source of truth)
-  bw.forecast_timestamp_utc AS forecast_hour_utc,
   bw.observation_timestamp_utc,
 
   -- Local timestamps (converted using location timezone)
@@ -80,7 +83,7 @@ SELECT
   -- Metadata
   CURRENT_TIMESTAMP AS refreshed_at
 
-FROM silver_filtered bw
+FROM silver_weather bw
 JOIN weather_data.locations l ON bw.location_id = l.id
 CROSS JOIN latest_observation
 WHERE bw.has_invalid_temperature = false
