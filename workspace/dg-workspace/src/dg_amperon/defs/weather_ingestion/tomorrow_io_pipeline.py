@@ -3,11 +3,6 @@
 Fetches weather data (hourly forecasts from now to +5d) for multiple locations
 in the Port of Brownsville area using the Tomorrow.io Timelines API.
 
-Configuration:
-- API key: .dlt/secrets.toml -> sources.tomorrow_io_access_token
-- Destination: DuckDB (.dlt/config.toml)
-- Locations: Static seed resource (non-REST endpoint)
-
 Architecture:
 - Uses dlt rest_api_source with declarative RESTAPIConfig
 - locations resource: Non-REST seed data (yields list of locations)
@@ -16,7 +11,8 @@ Architecture:
 - Single page responses (no pagination needed)
 
 To run:
-    python etl/tomorrow_io_pipeline.py
+    Local: python -m src.dg_amperon.defs.weather_ingestion.tomorrow_io_pipeline
+    Docker: docker-compose up dagster-webserver (runs via Dagster)
 """
 
 import dlt
@@ -26,9 +22,8 @@ from dlt.sources.rest_api import rest_api_source
 from dlt.sources.rest_api.typing import RESTAPIConfig
 from dlt.common.time import ensure_pendulum_datetime_utc
 from typing import List, Dict, Any, Generator, Optional
-from datetime import datetime, timedelta
 import pendulum
-from .utils import get_duckdb_path
+from dg_amperon.defs.weather_ingestion.utils import get_duckdb_path
 
 # Configure DLT logging level
 os.environ.setdefault("RUNTIME__LOG_LEVEL", "WARNING")
@@ -365,10 +360,13 @@ def create_pipeline(backfill_datetime: Optional[str] = None):
     observation_ts = get_normalized_observation_timestamp(backfill_datetime)
     mode = "BACKFILL" if backfill_datetime else "SCHEDULED"
 
-    # Create pipeline
+    db_path = get_duckdb_path()
+
+    logger.info(f"Using DuckDB with at {db_path}")
+
     pipeline = dlt.pipeline(
         pipeline_name="tomorrow_io",
-        destination=dlt.destinations.duckdb(str(get_duckdb_path())),
+        destination=dlt.destinations.duckdb(str(db_path)),
         dataset_name="weather_data",
         dev_mode=False,
         progress="log",
@@ -400,16 +398,17 @@ def run_pipeline(backfill_datetime: Optional[str] = None):
     observation_ts = get_normalized_observation_timestamp(backfill_datetime)
     mode = "BACKFILL" if backfill_datetime else "SCHEDULED"
 
-    # Create pipeline
+    db_path = get_duckdb_path()
+
+    logger.info(f"Using DuckDB with at {db_path}")
+
     pipeline = dlt.pipeline(
         pipeline_name="tomorrow_io",
-        destination=dlt.destinations.duckdb(str(get_duckdb_path())),
-        dataset_name="weather_data",  # Avoid ambiguity with database name
-        dev_mode=False,  # Production mode (stable schema)
+        destination=dlt.destinations.duckdb(str(db_path)),
+        dataset_name="weather_data",
+        dev_mode=False,
         progress="log",
     )
-
-    # DLT automatically sets DuckDB session timezone to UTC
     load_info = pipeline.run(tomorrow_io_source(backfill_datetime=backfill_datetime))
 
     logger.info(f"Load info: {load_info}")

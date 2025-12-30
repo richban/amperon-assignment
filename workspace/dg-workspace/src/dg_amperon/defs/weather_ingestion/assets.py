@@ -17,19 +17,14 @@ from dagster import (
     AssetCheckExecutionContext,
     AssetKey,
     AssetCheckResult,
-    AssetCheckSeverity,
     asset_check,
 )
+from dagster_duckdb import DuckDBResource
 from dagster_dlt import DagsterDltResource, dlt_assets, DagsterDltTranslator
 from dg_amperon.defs.weather_ingestion.tomorrow_io_pipeline import (
     tomorrow_io_source,
     create_pipeline,
 )
-from dg_amperon.defs.weather_ingestion.utils import get_duckdb_path
-import duckdb
-
-# Get database path using utility function (supports env vars and relative paths)
-DB_PATH = get_duckdb_path()
 
 
 class CustomDagsterDltTranslator(DagsterDltTranslator):
@@ -72,10 +67,9 @@ def weather_bronze_assets(
 
 
 @asset_check(asset=AssetKey(["weather_data", "locations"]))
-def check_locations_count(context: AssetCheckExecutionContext) -> AssetCheckResult:
+def check_locations_count(context: AssetCheckExecutionContext, duckdb_resource: DuckDBResource) -> AssetCheckResult:
     """Check that we have exactly 10 locations configured."""
-    conn = duckdb.connect(str(DB_PATH), read_only=True)
-    try:
+    with duckdb_resource.get_connection() as conn:
         result = conn.execute("""
             SELECT COUNT(*) as location_count
             FROM weather_data.locations
@@ -93,5 +87,3 @@ def check_locations_count(context: AssetCheckExecutionContext) -> AssetCheckResu
             },
             description=f"Found {location_count}/{expected_count} locations",
         )
-    finally:
-        conn.close()

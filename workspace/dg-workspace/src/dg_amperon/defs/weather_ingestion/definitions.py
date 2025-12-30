@@ -9,6 +9,7 @@ from dagster import (
 )
 from dagster_dlt import DagsterDltResource
 from dg_amperon.defs.weather_ingestion import assets
+from dg_amperon.defs.weather_ingestion.resources import create_duckdb_resource
 
 
 weather_bronze_job = define_asset_job(
@@ -32,5 +33,5 @@ defs = Definitions(
     asset_checks=load_asset_checks_from_modules([assets]),
     jobs=[weather_bronze_job],
     schedules=[weather_hourly_schedule],
-    resources={"dlt": DagsterDltResource()},
+    resources={"dlt": DagsterDltResource(), "duckdb_resource": create_duckdb_resource()},
 )
