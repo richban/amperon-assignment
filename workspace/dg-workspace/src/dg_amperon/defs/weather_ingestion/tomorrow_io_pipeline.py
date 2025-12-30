@@ -23,7 +23,9 @@ from dlt.sources.rest_api.typing import RESTAPIConfig
 from dlt.common.time import ensure_pendulum_datetime_utc
 from typing import List, Dict, Any, Generator, Optional
 import pendulum
-from dg_amperon.defs.weather_ingestion.utils import get_duckdb_path
+from dg_amperon.defs.weather_ingestion.utils import (
+    get_duckdb_path,
+)
 
 # Configure DLT logging level
 os.environ.setdefault("RUNTIME__LOG_LEVEL", "WARNING")
@@ -361,9 +363,9 @@ def create_pipeline(backfill_datetime: Optional[str] = None):
     mode = "BACKFILL" if backfill_datetime else "SCHEDULED"
 
     db_path = get_duckdb_path()
+    logger.info(f"Using DuckDB at {db_path}")
 
-    logger.info(f"Using DuckDB with at {db_path}")
-
+    # Pass S3 path directly - DLT will use AWS env vars automatically
     pipeline = dlt.pipeline(
         pipeline_name="tomorrow_io",
         destination=dlt.destinations.duckdb(str(db_path)),

@@ -10,8 +10,6 @@ from dagster_duckdb import DuckDBResource
 
 from dg_amperon.defs.weather_ingestion.utils import (
     get_duckdb_path,
-    get_duckdb_s3_config,
-    is_prod,
 )
 
 class ExtendedDuckDBResource(DuckDBResource):
@@ -68,12 +66,6 @@ def create_duckdb_resource() -> ExtendedDuckDBResource:
     """
     db_path = str(get_duckdb_path())
 
-    if is_prod():
-        connection_config = get_s3_config()
-    else:
-        connection_config = {}
-
     return ExtendedDuckDBResource(
         database=db_path,
-        connection_config=connection_config,
     )
