@@ -50,9 +50,9 @@ services:
   # ============================================================================
   marimo:
     image: amperon-dagster:latest
-    command: marimo edit --host 0.0.0.0 --port 8080 --no-token /app/notebooks/weather_viz.py
+    command: marimo edit --host 0.0.0.0 --port 2718 --no-token /app/notebooks/weather_viz.py
     ports:
-      - "8080:8080"
+      - "2718:2718"
     environment:
       ENVIRONMENT: dev
       DUCKDB_DATABASE: /app/data/weather.db
