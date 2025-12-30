@@ -31,7 +31,7 @@ SELECT
 
   -- UTC timestamps (source of truth)
   bw.forecast_timestamp_utc AS forecast_hour_utc,
-  bw.observation_timestamp_utc AS observed_at_utc,
+  bw.observation_timestamp_utc,
 
   -- Local timestamps (converted using location timezone)
   timezone(l.timezone, bw.forecast_timestamp_utc) AS forecast_hour_local,

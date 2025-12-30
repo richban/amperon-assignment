@@ -1,7 +1,7 @@
 MODEL (
   name weather_current,
-  kind INCREMENTAL_BY_TIME_RANGE (
-    time_column observation_timestamp_utc
+  kind INCREMENTAL_BY_UNIQUE_KEY (
+    unique_key location_id
   ),
   description 'Mart: Latest weather conditions per location (answers Q1)',
 );
@@ -31,10 +31,11 @@ WITH latest_per_location AS (
       PARTITION BY bw.location_id
       ORDER BY bw.observation_timestamp_utc DESC, bw.forecast_timestamp_utc DESC
     ) AS recency_rank
-  FROM bronze_weather bw
+  FROM silver_weather bw
   JOIN weather_data.locations l ON bw.location_id = l.id
   WHERE bw.has_invalid_temperature = false
     AND bw.has_invalid_wind = false
+    AND bw.observation_timestamp_utc BETWEEN @start_dt AND @end_dt
 )
 
 SELECT
