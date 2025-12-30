@@ -17,7 +17,7 @@ def _():
     from lonboard.colormap import apply_continuous_cmap
     import pandas as pd
     import altair as alt
-
+    import os
     return (
         H3HexagonLayer,
         Map,
@@ -27,14 +27,22 @@ def _():
         apply_continuous_cmap,
         duckdb,
         mo,
+        os,
         pd,
         plt,
     )
 
 
 @app.cell
-def _(Path, duckdb):
-    DB_PATH = Path(__file__).parent.parent.parent.parent.parent / "data" / "weather.db"
+def _(Path, duckdb, os):
+    db_path = os.getenv("DUCKDB_DATABASE")
+    if db_path:
+        DB_PATH = Path(db_path)
+    else:
+        DB_PATH = (
+            Path(__file__).parent.parent.parent.parent.parent / "data" / "weather.db"
+        )
+
     conn = duckdb.connect(str(DB_PATH), read_only=True)
     conn.execute("INSTALL h3 FROM community; LOAD h3;")
     return (conn,)
@@ -142,7 +150,6 @@ def _(Normalize, apply_continuous_cmap, plt):
         normalized = normalizer(temp_values)
         cmap = plt.get_cmap("RdYlBu_r")
         return apply_continuous_cmap(normalized, cmap)
-
     return (generate_colors,)
 
 
