@@ -214,6 +214,16 @@ def locations() -> Generator[List[Dict[str, Any]], Any, None]:
 
 
 @dlt.source
+def locations_source():
+    """
+    Standalone source for static locations table.
+
+    Used as a separate Dagster asset that doesn't need partitioning.
+    """
+    return locations()
+
+
+@dlt.source
 def tomorrow_io_source(
     tomorrow_io_access_token: str = dlt.secrets.value,
     backfill_datetime: Optional[str] = None,
