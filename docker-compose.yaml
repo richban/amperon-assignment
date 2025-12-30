@@ -1,7 +1,9 @@
 version: '3.8'
 
 services:
-
+  # ============================================================================
+  # Storage: MinIO (S3-compatible object storage)
+  # ============================================================================
   minio:
     image: minio/minio:latest
     command: server /data --console-address ":9001"
@@ -18,6 +20,8 @@ services:
       interval: 5s
       timeout: 3s
       retries: 3
+    networks:
+      - amperon
 
   minio-init:
     image: minio/mc:latest
@@ -28,44 +32,95 @@ services:
       /bin/sh -c "
       mc alias set myminio http://minio:9000 minioadmin minioadmin;
       mc mb myminio/datalake --ignore-existing;
-      echo 'MinIO bucket created successfully';
+      mc mb myminio/dlt-staging --ignore-existing;
+      echo 'MinIO buckets created';
       exit 0;
       "
+    networks:
+      - amperon
 
-  # tomorrow:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile
-  #   command: python -m tomorrow
-  #   environment:
-  #     TOMORROW_API_KEY: ${TOMORROW_API_KEY}
-  #     AWS_ACCESS_KEY_ID: minioadmin
-  #     AWS_SECRET_ACCESS_KEY: minioadmin
-  #     AWS_ENDPOINT_URL: http://minio:9000
-  #   volumes:
-  #     - "${PWD}/tomorrow:/app/tomorrow"
-  #   depends_on:
-  #     minio:
-  #       condition: service_healthy
-  #     minio-init:
-  #       condition: service_completed_successfully
-
-  jupyter:
+  # ============================================================================
+  # App: Dagster (all-in-one: webserver + daemon)
+  # ============================================================================
+  dagster:
     build:
       context: .
       dockerfile: Dockerfile
-    command: jupyter notebook --ip 0.0.0.0 --NotebookApp.token='' --NotebookApp.password='' --allow-root
+    command: >
+      sh -c "dagster-daemon run &
+             dagster-webserver -h 0.0.0.0 -p 3000"
     ports:
-      - "8888:8888"
+      - "3000:3000"   # Dagster UI
     environment:
+      # Environment
+      ENVIRONMENT: prod
+
+      # Tomorrow.io API
+      TOMORROW_API_KEY: ${TOMORROW_API_KEY}
+      SOURCES__TOMORROW_IO_PIPELINE__TOMORROW_IO_ACCESS_TOKEN: ${TOMORROW_API_KEY}
+
+      # Dagster
+      DAGSTER_HOME: /app/dagster_home
+
+      # Storage paths
+      DUCKDB_DATABASE: s3://datalake/duckdb/weather.db
+      SQLMESH_PROJECT_PATH: /app/sqlmesh
+
+      # AWS/S3 (for DuckDB + DLT)
       AWS_ACCESS_KEY_ID: minioadmin
       AWS_SECRET_ACCESS_KEY: minioadmin
       AWS_ENDPOINT_URL: http://minio:9000
+      AWS_REGION: us-east-1
+
+      # DLT Runtime
+      RUNTIME__LOG_LEVEL: INFO
+      NORMALIZE__DATA_WRITER__DISABLE_COMPRESSION: "true"
+
+      # DLT Filesystem Destination
+      DESTINATION__FILESYSTEM__BUCKET_URL: s3://dlt-staging
+      DESTINATION__FILESYSTEM__CREDENTIALS__AWS_ACCESS_KEY_ID: minioadmin
+      DESTINATION__FILESYSTEM__CREDENTIALS__AWS_SECRET_ACCESS_KEY: minioadmin
+      DESTINATION__FILESYSTEM__CREDENTIALS__ENDPOINT_URL: http://minio:9000
+      DESTINATION__FILESYSTEM__CREDENTIALS__AWS_REGION: us-east-1
     volumes:
-      - "${PWD}/analysis.ipynb:/app/analysis.ipynb"
+      # Mount source for hot reload during development
+      - ./workspace/dg-workspace/src:/app/src
+      - ./workspace/sqlmesh:/app/sqlmesh
     depends_on:
       minio:
         condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    networks:
+      - amperon
+
+  # ============================================================================
+  # Viz: Marimo (optional - for interactive notebooks)
+  # ============================================================================
+  marimo:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: marimo edit --host 0.0.0.0 --port 8080 --no-token /app/src/notebooks/weather_viz.py
+    ports:
+      - "8080:8080"
+    environment:
+      ENVIRONMENT: prod
+      DUCKDB_DATABASE: s3://datalake/duckdb/weather.db
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      AWS_ENDPOINT_URL: http://minio:9000
+      AWS_REGION: us-east-1
+    volumes:
+      - ./workspace/dg-workspace/src/notebooks:/app/src/notebooks
+    depends_on:
+      - minio
+    networks:
+      - amperon
+
+networks:
+  amperon:
+    driver: bridge
 
 volumes:
   minio_data:
