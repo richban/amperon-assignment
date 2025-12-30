@@ -84,7 +84,7 @@ def _(mo, run_selector):
     return (selected_run,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(conn, selected_run):
     forecast_times_df = conn.execute(f"""
         SELECT DISTINCT forecast_timestamp_utc
@@ -96,7 +96,7 @@ def _(conn, selected_run):
     return (forecast_times,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(forecast_times, mo):
     time_slider = mo.ui.slider(
         start=0,
@@ -110,7 +110,7 @@ def _(forecast_times, mo):
     return (time_slider,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(forecast_times, mo, time_slider):
     selected_time = forecast_times[time_slider.value]
 
@@ -124,7 +124,7 @@ def _(forecast_times, mo, time_slider):
     return (selected_time,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(conn, selected_run, selected_time):
     weather_arrow = conn.execute(f"""
         SELECT
@@ -141,7 +141,7 @@ def _(conn, selected_run, selected_time):
     return (weather_arrow,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(Normalize, apply_continuous_cmap, plt):
     def generate_colors(table):
         temp_values = table["temperature"].to_numpy()
@@ -153,7 +153,7 @@ def _(Normalize, apply_continuous_cmap, plt):
     return (generate_colors,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(H3HexagonLayer, Map, generate_colors, mo, weather_arrow):
     colors = generate_colors(weather_arrow)
 
@@ -209,7 +209,7 @@ def _(map_widget):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo, weather_arrow):
     temp_values = weather_arrow["temperature"].to_numpy()
     wind_values = weather_arrow["wind_speed"].to_numpy()
@@ -228,7 +228,7 @@ def _(mo, weather_arrow):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(conn, get_clicked_hex, mo, selected_run):
     # Get clicked location hex_id from state
     selected_hex = get_clicked_hex()
@@ -269,7 +269,7 @@ def _(conn, get_clicked_hex, mo, selected_run):
     return (timeseries_df,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(alt, mo, pd, timeseries_df):
     # Create temperature line chart
     if len(timeseries_df) == 0:
@@ -346,7 +346,7 @@ def _(alt, mo, pd, timeseries_df):
     return df, temp_chart_final
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(alt, df):
     # Wind Speed Line Chart
     wind_chart = (
