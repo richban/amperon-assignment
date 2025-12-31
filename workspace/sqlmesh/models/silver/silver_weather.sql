@@ -54,10 +54,7 @@ WITH latest_weather_data AS (
     values__wind_direction AS wind_direction_degrees,
 
     -- Precipitation
-    COALESCE(
-      values__precipitation_intensity__v_double,
-      CAST(values__precipitation_intensity AS DOUBLE)
-    ) AS precipitation_intensity_mmh,
+    CAST(values__precipitation_intensity AS DOUBLE) AS precipitation_intensity_mmh,
     values__precipitation_probability AS precipitation_probability_percent,
     values__precipitation_type AS precipitation_type_code,
 
