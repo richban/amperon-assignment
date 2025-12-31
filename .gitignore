@@ -163,5 +163,4 @@ cython_debug/
 blobs/*.json
 
 # DLT pipeline state
-.dlt/*
-!.dlt/config.toml
+data/dlt/*

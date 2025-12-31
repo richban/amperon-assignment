@@ -10,19 +10,11 @@ ENV PYTHONDONTWRITEBYTECODE=1
 # Install uv for fast dependency installation
 RUN pip install uv
 
-# Copy workspace files
 COPY workspace/dg-workspace /app
-
-# Install dependencies using uv (includes dagster CLI with webserver and daemon)
-RUN uv pip install --system -e . && \
-    uv pip install --system dagster-webserver dagster-dg-cli
-
-# Copy SQLMesh models
 COPY workspace/sqlmesh /app/sqlmesh
 
-# Create necessary directories
-RUN mkdir -p /app/dagster_home
+RUN uv pip install --system -e .
 
-# Set default environment variables (can be overridden by docker-compose)
-ENV DAGSTER_HOME=/app/dagster_home
+RUN mkdir -p /app/data
+
 ENV PYTHONPATH=/app/src:$PYTHONPATH

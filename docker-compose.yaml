@@ -9,12 +9,10 @@ services:
       context: .
       dockerfile: Dockerfile
     image: amperon-dagster:latest
-    command: >
-      sh -c "
-      dg dev --host 0.0.0.0 --port 3000
-      "
+    command: dg dev --host 0.0.0.0 --port 3000
     ports:
       - "3000:3000"   # Dagster UI
+      - "8000:8000"   # Marimo (on-demand)
     environment:
       # Environment
       ENVIRONMENT: dev
@@ -24,7 +22,7 @@ services:
       SOURCES__TOMORROW_IO_PIPELINE__TOMORROW_IO_ACCESS_TOKEN: ${TOMORROW_API_KEY}
 
       # Dagster
-      DAGSTER_HOME: /app/dagster_home
+      DAGSTER_HOME: /app/data/dagster_home
 
       # Storage paths (local files)
       DUCKDB_DATABASE: /app/data/weather.db
@@ -32,31 +30,11 @@ services:
 
       # DLT Runtime
       RUNTIME__LOG_LEVEL: INFO
-    volumes:
-      # Mount source for hot reload
-      - ./workspace/dg-workspace/src:/app/src
-      - ./workspace/sqlmesh:/app/sqlmesh
-      # Mount data directory for DuckDB
-      - ./data:/app/data
-      # Mount dagster_home for persistence
-      - ./data/dagster_home:/app/dagster_home
-    networks:
-      - amperon
 
-
-  # ============================================================================
-  # Marimo: Visualization notebook
-  # ============================================================================
-  marimo:
-    image: amperon-dagster:latest
-    command: marimo edit --host 0.0.0.0 --port 2718 --no-token --no-skew-protection /app/notebooks/weather_viz.py
-    ports:
-      - "2718:2718"
-    environment:
-      ENVIRONMENT: dev
-      DUCKDB_DATABASE: /app/data/weather.db
+      # DLT Data Directory
+      DLT_DATA_DIR: /app/data/dlt
     volumes:
-      - ./workspace/dg-workspace/src/notebooks:/app/notebooks
+      # Mount data directory for all persistent data (DuckDB, Dagster Home, DLT State)
       - ./data:/app/data
     networks:
       - amperon
