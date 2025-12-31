@@ -39,8 +39,8 @@ This project implements a **real-time weather data pipeline** that ingests hourl
 └────────┬────────┘
          │ HTTP/JSON (hourly)
          ↓
-┌─────────────────────────────────────────────────────┐
-│                  INGESTION LAYER                     │
+┌────────────────────────────────────────────────────┐
+│                  INGESTION LAYER                   │
 │  ┌──────────────────────────────────────────────┐  │
 │  │ DLT (Data Load Tool)                         │  │
 │  │ - API Client with retry logic                │  │
@@ -55,7 +55,7 @@ This project implements a **real-time weather data pipeline** that ingests hourl
 │  │ - Asset dependency tracking                  │  │
 │  │ - Retry policies & error handling            │  │
 │  └──────────────────┬───────────────────────────┘  │
-└────────────────────┬┴───────────────────────────────┘
+└────────────────────┬┴──────────────────────────────┘
                      │
          ┌───────────▼──────────┐
          │   DuckDB (Storage)   │
@@ -64,35 +64,35 @@ This project implements a **real-time weather data pipeline** that ingests hourl
          │  - observations (∞)  │
          └───────────┬──────────┘
                      │
-┌────────────────────▼────────────────────────────────┐
-│              TRANSFORMATION LAYER                    │
+┌────────────────────▼───────────────────────────────┐
+│              TRANSFORMATION LAYER                  │
 │  ┌──────────────────────────────────────────────┐  │
 │  │ SQLMesh (Declarative Transformations)        │  │
 │  │                                              │  │
-│  │ Silver Layer (Cleaning):                    │  │
-│  │  └─ silver_weather                          │  │
-│  │      - Data quality flags                   │  │
-│  │      - Type casting & normalization         │  │
-│  │      - Bitemporal preservation              │  │
+│  │ Silver Layer (Cleaning):                     │  │
+│  │  └─ silver_weather                           │  │
+│  │      - Data quality flags                    │  │
+│  │      - Type casting & normalization          │  │
+│  │      - Bitemporal preservation               │  │
 │  │                                              │  │
-│  │ Mart Layer (Business Logic):                │  │
-│  │  ├─ weather_current (SNAPSHOT)              │  │
-│  │  │   - 1 row per location (10 total)        │  │
-│  │  │   - Nowcast (T+0 forecast)               │  │
-│  │  │   - INCREMENTAL_BY_UNIQUE_KEY            │  │
-│  │  │                                          │  │
-│  │  └─ weather_timeseries (SLIDING WINDOW)     │  │
-│  │      - 144 rows per location (1,440 total)  │  │
-│  │      - 24h historical + 120h forecast       │  │
-│  │      - FULL refresh strategy                │  │
+│  │ Mart Layer (Business Logic):                 │  │
+│  │  ├─ weather_current (SNAPSHOT)               │  │
+│  │  │   - 1 row per location (10 total)         │  │
+│  │  │   - Nowcast (T+0 forecast)                │  │
+│  │  │   - INCREMENTAL_BY_UNIQUE_KEY             │  │
+│  │  │                                           │  │
+│  │  └─ weather_timeseries (SLIDING WINDOW)      │  │
+│  │      - 144 rows per location (1,440 total)   │  │
+│  │      - 24h historical + 120h forecast        │  │
+│  │      - FULL refresh strategy                 │  │
 │  │                                              │  │
-│  │ Data Quality (Audits):                      │  │
-│  │  - Location completeness (10 locations)     │  │
-│  │  - Row count validation (144 per location)  │  │
-│  │  - NOT NULL checks on critical fields       │  │
-│  │  - Unique key constraints                   │  │
+│  │ Data Quality (Audits):                       │  │
+│  │  - Location completeness (10 locations)      │  │
+│  │  - Row count validation (144 per location)   │  │
+│  │  - NOT NULL checks on critical fields        │  │
+│  │  - Unique key constraints                    │  │
 │  └──────────────────────────────────────────────┘  │
-└────────────────────┬────────────────────────────────┘
+└────────────────────┬───────────────────────────────┘
                      │
          ┌───────────▼──────────┐
          │   DuckDB (Marts)     │
@@ -102,14 +102,14 @@ This project implements a **real-time weather data pipeline** that ingests hourl
          └───────────┬──────────┘
                      │
 ┌────────────────────▼────────────────────────────────┐
-│              VISUALIZATION LAYER                     │
-│  ┌──────────────────────────────────────────────┐  │
-│  │ Marimo (Interactive Dashboard)               │  │
-│  │ - H3 hexagon map (GPU-accelerated)           │  │
-│  │ - Time slider (144-hour window)              │  │
-│  │ - Temperature & wind charts                  │  │
-│  │ - Location drill-down                        │  │
-│  └──────────────────────────────────────────────┘  │
+│              VISUALIZATION LAYER                    │
+│  ┌──────────────────────────────────────────────┐   │
+│  │ Marimo (Interactive Dashboard)               │   │
+│  │ - H3 hexagon map (GPU-accelerated)           │   │
+│  │ - Time slider (144-hour window)              │   │
+│  │ - Temperature & wind charts                  │   │
+│  │ - Location drill-down                        │   │
+│  └──────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -337,35 +337,16 @@ ORDER BY location_id, forecast_timestamp_utc
 - [uv](https://github.com/astral-sh/uv) (recommended) or pip
 - Docker & Docker Compose (optional, for containerized deployment)
 
-### Option 1: Local Development
 
-```bash
-# 1. Clone repository
-git clone <repo-url>
-cd amperon
 
-# 2. Set up Dagster workspace
-cd workspace/dg-workspace
-cp .env.example .env
-# Edit .env and add your TOMORROW_API_KEY and SOURCES__TOMORROW_IO_PIPELINE__TOMORROW_IO_ACCESS_TOKEN
-
-# 3. Install dependencies
-uv pip install -e .
-uv pip install -e .[dev]
-
-# 4. Start Dagster UI
-dg dev
-# Open http://localhost:3000
-
-# 5. Run pipeline manually via Web Console
-```
-
-### Option 2: Docker Deployment
+### Docker Deployment
 
 ```bash
 # 1. Configure environment
+cd workspace/dg-workspace
 cp .env.example .env
 # Edit .env and add TOMORROW_API_KEY and SOURCES__TOMORROW_IO_PIPELINE__TOMORROW_IO_ACCESS_TOKEN
+source .env
 
 # 2. Start services
 docker-compose up -d
@@ -373,50 +354,34 @@ docker-compose up -d
 # 3. Access services
 # Dagster UI: http://localhost:3000
 # Marimo Viz: http://localhost:2718
-```
 
+# 4. Run pipeline manually via Web Console
+# Open http://localhost:3000
+
+# 5. Or materialize all assets via dagster cli
+docker-compose exec dagster dagster asset materialize -m dg_amperon.definitions --select '*'
+```
 
 ## Usage
 
-### 1. Start Dagster   Web Server
+### 1. Start Dagster Web Server
 
 ```bash
-# Start Dagster UI and daemon
-dg dev
+# via docker-compose
+docker-compose up -d
 
 # In browser (http://localhost:3000):
 # Navigate to: Lineage → Materialzie All (Latest)
 ```
 
-### 2. Manual Materialization (Single Partition)
+### 2. Materialization via CLI
 
 ```bash
-# Materialize current hour
-dg launch --assets weather_data/weather_observations
-
-# Or specific partition (backfill)
-dagster asset materialize \
-  --select weather_data/weather_observations \
-  --partition 2025-12-30-14:00
+# via docker-compose
+docker-compose exec dagster dagster asset materialize -m dg_amperon.definitions --select '*' --partition-key "2024-01-14"
 ```
 
-### 3. Run SQLMesh Transformations
-
-```bash
-# Inside Dagster container or local terminal
-cd workspace/sqlmesh
-
-# Preview changes (dry run)
-sqlmesh plan
-
-# Apply changes
-sqlmesh plan --auto-apply
-
-# Run transformations (processes latest data)
-sqlmesh run
-```
-
-### 5. View Visualization and Query Data from Notebook
+### 3. View Visualization and Query Data from Notebook
 
 ```bash
 # Start Marimo dashboard
@@ -425,8 +390,6 @@ docker-compose up marimo -d
 # Open browser
 open http://localhost:2718
 ```
-
----
 
 ## Scale Considerations
 
@@ -497,7 +460,7 @@ amperon/
 │   │   │   │   │   ├── definitions.py     ← Jobs, schedules, resources
 │   │   │   │   │   ├── tomorrow_io_pipeline.py ← DLT source implementation
 │   │   │   │   │   └── resources.py       ← DuckDB resource config
-│   │   │   │   └── sqlmesh/               ← SQLMesh assets (future)
+│   │   │   │   └── sqlmesh/               ← SQLMesh assets
 │   │   │   └── definitions.py             ← Root Dagster definitions
 │   │   ├── tests/                         ← Unit & integration tests
 │   │   ├── .env.example                   ← Environment variable template
@@ -506,7 +469,7 @@ amperon/
 │       ├── config.yaml                    ← SQLMesh configuration
 │       ├── models/
 │       │   ├── silver/
-│       │   │   └── silver_weather.sql     ← Cleaning layer
+│       │   │   └── silver_weather.sql     ← Silver layer
 │       │   └── marts/
 │       │       ├── weather_current.sql    ← Snapshot (10 rows)
 │       │       └── weather_timeseries.sql ← Sliding window (1,440 rows)

@@ -11,41 +11,140 @@ This Dagster workspace implements the orchestration layer for the weather foreca
 - **Data quality checks** via asset checks
 - **Retry policies** and error handling
 
----
 
 ## Architecture
 
 ### Asset Dependency Graph
+
+![/DAG](../../docs/img/dag.png)
+
+### Asset Definitions
+
+```bash
+┏━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Section      ┃ Definitions                                                                                                                                       ┃
+┡━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Assets       │ ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓ │
+│              │ ┃ Key                               ┃ Group                   ┃ Deps                              ┃ Kinds   ┃ Description                       ┃ │
+│              │ ┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩ │
+│              │ │ /silver_weather                   │ sqlmesh_transformations │ weather_data/weather_observations │ duckdb  │ SQLMesh transformation assets for │ │
+│              │ │                                   │                         │                                   │ sqlmesh │ weather data.                     │ │
+│              │ ├───────────────────────────────────┼─────────────────────────┼───────────────────────────────────┼─────────┼───────────────────────────────────┤ │
+│              │ │ /weather_current                  │ sqlmesh_transformations │ /silver_weather                   │ duckdb  │ SQLMesh transformation assets for │ │
+│              │ │                                   │                         │ weather_data/locations            │ sqlmesh │ weather data.                     │ │
+│              │ ├───────────────────────────────────┼─────────────────────────┼───────────────────────────────────┼─────────┼───────────────────────────────────┤ │
+│              │ │ /weather_timeseries               │ sqlmesh_transformations │ /silver_weather                   │ duckdb  │ SQLMesh transformation assets for │ │
+│              │ │                                   │                         │ weather_data/locations            │ sqlmesh │ weather data.                     │ │
+│              │ ├───────────────────────────────────┼─────────────────────────┼───────────────────────────────────┼─────────┼───────────────────────────────────┤ │
+│              │ │ locations_source_locations        │ default                 │                                   │         │                                   │ │
+│              │ ├───────────────────────────────────┼─────────────────────────┼───────────────────────────────────┼─────────┼───────────────────────────────────┤ │
+│              │ │ weather_data/locations            │ weather_ingestion       │ locations_source_locations        │ dlt     │                                   │ │
+│              │ │                                   │                         │                                   │ duckdb  │     Seed resource: Static list of │ │
+│              │ │                                   │                         │                                   │         │ locations to fetch weather data   │ │
+│              │ │                                   │                         │                                   │         │ for.                              │ │
+│              │ │                                   │                         │                                   │         │                                   │ │
+│              │ │                                   │                         │                                   │         │     This is NOT a REST endpoi…    │ │
+│              │ ├───────────────────────────────────┼─────────────────────────┼───────────────────────────────────┼─────────┼───────────────────────────────────┤ │
+│              │ │ weather_data/weather_observations │ weather_ingestion       │ weather_data/locations            │ dlt     │                                   │ │
+│              │ │                                   │                         │                                   │ duckdb  │         Inject                    │ │
+│              │ │                                   │                         │                                   │         │ observation_timestamp into each   │ │
+│              │ │                                   │                         │                                   │         │ weather observation.              │ │
+│              │ │                                   │                         │                                   │         │                                   │ │
+│              │ │                                   │                         │                                   │         │         Adds:                     │ │
+│              │ │                                   │                         │                                   │         │         - observati…              │ │
+│              │ └───────────────────────────────────┴─────────────────────────┴───────────────────────────────────┴─────────┴───────────────────────────────────┘ │
+│ Asset Checks │ ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓                   │
+│              │ ┃ Key                                          ┃ Deps                   ┃ Description                                         ┃                   │
+│              │ ┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩                   │
+│              │ │ weather_data/locations:check_locations_count │ weather_data/locations │ Check that we have exactly 10 locations configured. │                   │
+│              │ └──────────────────────────────────────────────┴────────────────────────┴─────────────────────────────────────────────────────┘                   │
+│ Jobs         │ ┏━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓                                                     │
+│              │ ┃ Key                      ┃ Description                                                    ┃                                                     │
+│              │ ┡━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩                                                     │
+│              │ │ weather_observations_job │ Ingest weather observations from Tomorrow.io API (partitioned) │                                                     │
+│              │ └──────────────────────────┴────────────────────────────────────────────────────────────────┘                                                     │
+│ Schedules    │ ┏━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━┓                                                                                                           │
+│              │ ┃ Key                     ┃ Cron      ┃                                                                                                           │
+│              │ ┡━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━┩                                                                                                           │
+│              │ │ weather_hourly_schedule │ 0 * * * * │                                                                                                           │
+│              │ └─────────────────────────┴───────────┘                                                                                                           │
+│ Resources    │ ┏━━━━━━━━━━━━━━━━━┓                                                                                                                               │
+│              │ ┃ Key             ┃                                                                                                                               │
+│              │ ┡━━━━━━━━━━━━━━━━━┩                                                                                                                               │
+│              │ │ dlt             │                                                                                                                               │
+│              │ ├─────────────────┤                                                                                                                               │
+│              │ │ duckdb_resource │                                                                                                                               │
+│              │ ├─────────────────┤                                                                                                                               │
+│              │ │ sqlmesh         │                                                                                                                               │
+│              │ └─────────────────┘                                                                                                                               │
+└──────────────┴───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+
+
 
 
 ### Partition Management
 
 #### Hourly Partition Definition
 
-- **`start_date`**: First partition available (historical backfill start point)
+- **`start_date=2025-12-30-12:00`**: First partition available (historical backfill start point)
 - **`timezone="UTC"`**: Critical for consistent scheduling across environments
 - **`end_offset=1`**: Makes partition available **immediately** when hour begins
   - Without this: Hour 16:00 only available at 17:00
   - With this: Hour 16:00 available at 16:00 (real-time processing)
 - **Dagster format**: `"YYYY-MM-DD-HH:MM"`
-- **Example**: `"2025-12-30-16:00"`
 
+## Installation
+
+### Local Development
+
+```bash
+# 1. Clone repository
+git clone <repo-url>
+cd amperon
+
+# 2. Set up Dagster workspace
+cp .env.example .env
+# Edit .env and add your TOMORROW_API_KEY and SOURCES__TOMORROW_IO_PIPELINE__TOMORROW_IO_ACCESS_TOKEN
+source .env
+
+# 3. Install dependencies
+uv pip install -e .
+uv pip install -e .[dev]
+```
+
+## Usage
+
+```bash
+# 4. Start Dagster UI
+dg dev
+
+# 5. Run pipeline manually via Web Console
+# Open http://localhost:3000
+
+# 6. Materialize all assets via dg cli
+dg launch --assets "*" --partition-key "2025-12-30-12:00"
+```
 
 ## Testing
 
 ### Unit Tests
+
 ```bash
--- Unit Tests
+# Run all tests
+pytest tests/
+
+# Unit Tests
 pytest tests/unit/
 
--- Integration Tests
-pytest tests/integration/test_pipeline_e2e.py
+# Integration Tests
+pytest tests/integration/
 ```
-
 
 ## File Structure
 
-```
+```bash
 dg-workspace/
 ├── src/
 │   └── dg_amperon/

@@ -203,3 +203,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# DLT
+.dlt/secrets.toml  # Contains API keys
+
