@@ -1,6 +1,6 @@
 # Weather Data Pipeline - Amperon Take-Home Assignment
 
-> **A production-grade weather forecasting pipeline built with DLT, Dagster, SQLMesh, and DuckDB**
+> **A production-grade weather forecasting pipeline built with DLT, Dagster, SQLMesh, DuckDB and Marimo**
 
 ## Introduction
 
@@ -27,7 +27,6 @@ This project implements a **real-time weather data pipeline** that ingests hourl
 4. **Data quality audits** ensuring completeness and validity
 5. **Interactive visualization** for real-time monitoring
 
----
 
 ## Architecture
 
@@ -114,9 +113,8 @@ This project implements a **real-time weather data pipeline** that ingests hourl
 └─────────────────────────────────────────────────────┘
 ```
 
----
 
-## Tool Stack
+## Tech Stack
 
 ### 1. DLT (Data Load Tool) - Ingestion
 
@@ -133,7 +131,6 @@ This project implements a **real-time weather data pipeline** that ingests hourl
 - `weather_data.locations`: Static location master (10 rows)
 - `weather_data.weather_observations`: Bitemporal fact table (append-only)
 
----
 
 ### 2. Dagster - Orchestration
 
@@ -147,7 +144,6 @@ This project implements a **real-time weather data pipeline** that ingests hourl
 - ✅ **Type safety**: Python-native with type hints
 
 
----
 
 ### 3. SQLMesh - Transformations
 
@@ -168,8 +164,6 @@ This project implements a **real-time weather data pipeline** that ingests hourl
 | `weather_current` | INCREMENTAL_BY_UNIQUE_KEY | Snapshot (1 row per location), upsert by location_id |
 | `weather_timeseries` | FULL | Sliding window (144h), rebuilt hourly to ensure freshness |
 
-
----
 
 ### 4. DuckDB - Storage & Analytics
 
@@ -220,7 +214,6 @@ This project implements a **real-time weather data pipeline** that ingests hourl
 **Idempotency**: MERGE write disposition (upsert on id)
 **Cardinality**: 10 rows (static)
 
----
 
 #### `weather_data.weather_observations`
 **Purpose**: Bitemporal fact table storing all forecast snapshots.
@@ -253,7 +246,6 @@ observation_timestamp    start_time              temperature
 2025-12-30 16:00:00     2025-12-31 16:00:00     15.2°C  ← +24h forecast
 ```
 
----
 
 ### Silver Layer (SQLMesh Cleaning)
 
@@ -277,7 +269,7 @@ observation_timestamp    start_time              temperature
 - `temperature_celsius`, `wind_speed_mps` (cleaned)
 - `has_invalid_temperature`, `has_invalid_wind` (quality flags)
 
----
+
 
 ### Mart Layer (SQLMesh Business Logic)
 
@@ -466,6 +458,25 @@ open http://localhost:2718
   - **Native time-series functions**
 
 
+## Monitoring & Observability
+
+### Dagster UI
+- **Asset lineage**: Visual dependency graph
+- **Run history**: Success/failure tracking
+- **Logs**: Structured logging per run
+- **Sensors**: Future alerting on failures
+
+### SQLMesh
+- **Audit results**: Data quality check outcomes
+- **Model diffs**: Change detection between runs
+- **Execution plans**: Preview transformations before applying
+
+### Metrics to Track
+- **API latency**: Tomorrow.io response times
+- **Row counts**: Expected vs. actual per run
+- **Data freshness**: Time since last successful run
+- **Audit failures**: Data quality violations
+
 ## Project Structure
 
 ```
@@ -506,48 +517,6 @@ amperon/
 └── notebooks/
     └── weather_viz.py                     ← Marimo interactive dashboard
 ```
-
-
-## Testing
-
-### Unit Tests
-```bash
-cd workspace/dg-workspace
-pytest tests/unit/
-```
-
-### Integration Tests
-```bash
-pytest tests/integration/test_pipeline_e2e.py
-```
-
-### Data Quality Tests (SQLMesh Audits)
-```bash
-cd workspace/sqlmesh
-sqlmesh test
-```
-
-
-## Monitoring & Observability
-
-### Dagster UI
-- **Asset lineage**: Visual dependency graph
-- **Run history**: Success/failure tracking
-- **Logs**: Structured logging per run
-- **Sensors**: Future alerting on failures
-
-### SQLMesh
-- **Audit results**: Data quality check outcomes
-- **Model diffs**: Change detection between runs
-- **Execution plans**: Preview transformations before applying
-
-### Metrics to Track
-- **API latency**: Tomorrow.io response times
-- **Row counts**: Expected vs. actual per run
-- **Data freshness**: Time since last successful run
-- **Audit failures**: Data quality violations
-
----
 
 ## Future Enhancements
 
