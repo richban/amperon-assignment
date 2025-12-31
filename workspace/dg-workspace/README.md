@@ -14,11 +14,13 @@ This Dagster workspace implements the orchestration layer for the weather foreca
 
 ## Architecture
 
-### Asset Dependency Graph
+### Dagster - Asset Dependency Graph
 
 ![/DAG](../../docs/img/dag.png)
 
 ### Asset Definitions
+
+`cd amperon/workspace/dg-workspace && dg list defs`
 
 ```bash
 ┏━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
@@ -80,10 +82,6 @@ This Dagster workspace implements the orchestration layer for the weather foreca
 └──────────────┴───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-
-
-
-
 ### Partition Management
 
 #### Hourly Partition Definition
@@ -137,6 +135,20 @@ cd workspace/dg-workspace/src &&  marimo edit notebooks/weather_viz.py
 
 ![/MARIMO_VIZ](../../docs/img/marimo.png)
 
+## DLT Pipeline
+
+```bash
+dlt pipeline --list-pipelines
+
+# tomorrow_io (last run: 1 minute ago (2025-12-31 20:50:22))
+
+dlt dashboard
+
+# URL: http://localhost:2718
+```
+
+![/DLT_DASHBOARD](../../docs/img/dlt_workspace.png)
+
 
 ## Testing
 
@@ -164,7 +176,7 @@ dg-workspace/
 │       │   │   ├── __init__.py
 │       │   │   ├── assets.py                 # @dlt_assets definitions
 │       │   │   ├── definitions.py            # Jobs, schedules, resources
-│       │   │   ├── tomorrow_io_pipeline.py   # DLT source implementation
+│       │   │   ├── tomorrow_io_pipeline.py   # DLT pipeline implementation
 │       │   │   ├── resources.py              # DuckDB resource factory
 │       │   │   └── utils.py                  # Helper functions
 │       │   └── __init__.py

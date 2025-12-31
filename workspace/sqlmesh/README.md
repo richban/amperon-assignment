@@ -1,3 +1,16 @@
+# SQLMesh Project
+
+```bash
+sqlmesh plan dev
+```
+
+```bash
+sqlmesh ui
+```
+
+![/DAG](../../docs/img/sqlmesh_ui.png)
+
+
 ## Data Quality Audits
 
 SQLMesh enforces data quality through **declarative audits**:

@@ -352,7 +352,6 @@ docker-compose up -d
 
 # 3. Access services
 # Dagster UI: http://localhost:3000
-# Marimo Viz: http://localhost:2718
 
 # 4. Run pipeline manually via Web Console
 # Open http://localhost:3000
@@ -386,7 +385,7 @@ docker-compose exec dagster dagster asset materialize -m dg_amperon.definitions 
 
 ```bash
 # Start Marimo dashboard
-docker-compose up marimo -d
+docker exec -it amperon-dagster-1 marimo edit --host 0.0.0.0 --port 8000 --no-token --no-skew-protection /app/src/notebooks/weather_viz.py
 
 # Open browser
 open http://localhost:2718
@@ -432,15 +431,25 @@ open http://localhost:2718
 ## Monitoring & Observability
 
 ### Dagster UI
+
 - **Asset lineage**: Visual dependency graph
 - **Run history**: Success/failure tracking
 - **Logs**: Structured logging per run
 - **Sensors**: Future alerting on failures
 
-### SQLMesh
+### SQLMesh UI
+
 - **Audit results**: Data quality check outcomes
 - **Model diffs**: Change detection between runs
 - **Execution plans**: Preview transformations before applying
+- **Command**: `cd workspace/sqlmesh && sqlmesh ui`
+
+### DLT Dashboard
+
+- Get an overview of the pipeline state
+- Inspect all schemas of your pipeline, including tables, child tables, and columns, along with all column hints
+- Inspect the incremental state of each resource
+- **Command**: `dlt dashboard`
 
 ### Metrics to Track
 - **API latency**: Tomorrow.io response times
