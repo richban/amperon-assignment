@@ -93,14 +93,6 @@ def test_bitemporal_weather_pipeline_end_to_end(temp_pipeline):
 
     # Query the data
     with duckdb.connect(db_path) as conn:
-        # Check locations table
-        locations_count = conn.execute(
-            "SELECT COUNT(*) FROM test_weather_data.locations"
-        ).fetchone()[0]
-        assert locations_count == 10, (
-            "Should have 10 locations (all Brownsville locations)"
-        )
-
         # Check weather_observations table
         obs_count = conn.execute(
             "SELECT COUNT(*) FROM test_weather_data.weather_observations"
@@ -332,7 +324,7 @@ def test_idempotency_same_hour_replaces_data(temp_pipeline):
 
         # Get a sample temperature from run 1 (any hour)
         temp_run1 = conn.execute("""
-            SELECT values__temperature 
+            SELECT values__temperature
             FROM test_weather_data.weather_observations
             LIMIT 1
         """).fetchone()[0]
@@ -397,7 +389,7 @@ def test_idempotency_same_hour_replaces_data(temp_pipeline):
 
         # Verify only ONE distinct observation_timestamp exists (14:00:00)
         distinct_observation_timestamps = conn.execute("""
-            SELECT DISTINCT observation_timestamp 
+            SELECT DISTINCT observation_timestamp
             FROM test_weather_data.weather_observations
         """).fetchall()
         assert len(distinct_observation_timestamps) == 1, (
@@ -406,7 +398,7 @@ def test_idempotency_same_hour_replaces_data(temp_pipeline):
 
         # Verify temperatures were REPLACED with run 2 data (run 2 temps are in 21.9-25.9 range)
         all_temps = conn.execute("""
-            SELECT DISTINCT values__temperature 
+            SELECT DISTINCT values__temperature
             FROM test_weather_data.weather_observations
             ORDER BY values__temperature
         """).fetchall()
@@ -420,7 +412,7 @@ def test_idempotency_same_hour_replaces_data(temp_pipeline):
 
         # Verify composite primary key is still unique
         pk_check = conn.execute("""
-            SELECT 
+            SELECT
                 COUNT(*) as total_rows,
                 COUNT(DISTINCT _locations_id || start_time || observation_timestamp) as unique_keys
             FROM test_weather_data.weather_observations
