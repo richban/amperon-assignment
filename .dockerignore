@@ -1,0 +1,14 @@
+# Docker Ignore file to keep images slim and clean
+**/*.pyc
+**/__pycache__
+**/.venv
+**/tests
+**/.pytest_cache
+**/.git
+**/.DS_Store
+**/.env
+**/.envrc
+**/data
+**/sqlmesh/.cache
+**/sqlmesh/logs
+**/dagster_home
