@@ -21,6 +21,7 @@ from dagster import (
     HourlyPartitionsDefinition,
     BackfillPolicy,
 )
+from dagster._core.errors import DagsterInvariantViolationError
 from dagster_duckdb import DuckDBResource
 from dagster_dlt import DagsterDltResource, dlt_assets, DagsterDltTranslator
 from dg_amperon.defs.weather_ingestion.tomorrow_io_pipeline import (
@@ -91,24 +92,13 @@ def weather_observations_bronze_asset(
     context: AssetExecutionContext,
     dlt: DagsterDltResource,
 ):
-    """Hourly partitioned weather observations."""
-    # Check if we're doing a backfill (multiple partitions)
-    if hasattr(context, "partition_key_range") and context.partition_key_range:
-        # For backfills with multiple partitions
-        start_key = context.partition_key_range.start
-        end_key = context.partition_key_range.end
-        context.log.info(f"Executing backfill from {start_key} to {end_key}")
+    """Hourly partitioned weather observations.
 
-        # For now, process the start partition (can be enhanced for multi-partition backfills)
-        # Convert partition key format: "2025-12-30-14:00" -> "2025-12-30T14:00:00"
-        parts = start_key.rsplit("-", 1)  # ["2025-12-30", "14:00"]
-        backfill_datetime = f"{parts[0]}T{parts[1]}:00"  # "2025-12-30T14:00:00"
-        context.log.info(
-            f"Converted start partition to ISO format: {backfill_datetime}"
-        )
-        source = tomorrow_io_source(backfill_datetime=backfill_datetime)
-    elif hasattr(context, "partition_key") and context.partition_key:
-        # For single partition
+    Only processes a single partition at a time.
+    The tomorrow_io_source accepts a single backfill_datetime, not a range.
+    """
+    # Try to get partition_key (for scheduled runs or single partition materializations)
+    try:
         partition_key = context.partition_key
         context.log.info(f"Processing hourly partition: {partition_key}")
 
@@ -119,9 +109,9 @@ def weather_observations_bronze_asset(
         backfill_datetime = f"{parts[0]}T{parts[1]}:00"  # "2025-12-30T14:00:00"
         context.log.info(f"Converted partition key to ISO format: {backfill_datetime}")
         source = tomorrow_io_source(backfill_datetime=backfill_datetime)
-    else:
-        # Non-partitioned run (scheduled mode)
-        context.log.info("Running in scheduled mode (no partition)")
+    except (AttributeError, DagsterInvariantViolationError):
+        # Non-partitioned run - use current time
+        context.log.info("No partition key found - using current time")
         source = tomorrow_io_source()
 
     # Run DLT pipeline via DagsterDltResource
