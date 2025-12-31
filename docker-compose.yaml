@@ -49,7 +49,7 @@ services:
   # ============================================================================
   marimo:
     image: amperon-dagster:latest
-    command: marimo edit --host 0.0.0.0 --port 2718 --no-token /app/notebooks/weather_viz.py
+    command: marimo edit --host 0.0.0.0 --port 2718 --no-token --no-skew-protection /app/notebooks/weather_viz.py
     ports:
       - "2718:2718"
     environment:
