@@ -52,7 +52,7 @@ def _(Path, duckdb, os):
 def _(conn):
     runs_df = conn.execute("""
         SELECT DISTINCT observation_timestamp_utc
-        FROM default__dev.silver_weather
+        FROM default__dev.weather_timeseries
         ORDER BY observation_timestamp_utc DESC
     """).df()
     available_runs = runs_df["observation_timestamp_utc"].tolist()
@@ -88,7 +88,7 @@ def _(mo, run_selector):
 def _(conn, selected_run):
     forecast_times_df = conn.execute(f"""
         SELECT DISTINCT forecast_timestamp_utc
-        FROM default__dev.silver_weather
+        FROM default__dev.weather_timeseries
         WHERE observation_timestamp_utc = '{selected_run}'
         ORDER BY forecast_timestamp_utc
     """).df()
@@ -129,14 +129,14 @@ def _(conn, selected_run, selected_time):
     weather_arrow = conn.execute(f"""
         SELECT
             h3_latlng_to_cell(l.lat, l.lon, 9) AS hex_id,
-            bw.temperature_celsius AS temperature,
-            bw.wind_speed_mps AS wind_speed,
+            wt.temperature_celsius AS temperature,
+            wt.wind_speed_mps AS wind_speed,
             l.lat,
             l.lon
-        FROM default__dev.silver_weather bw
-        JOIN weather_data.locations l ON l.id = bw.location_id
-        WHERE bw.observation_timestamp_utc = '{selected_run}'
-          AND bw.forecast_timestamp_utc = '{selected_time}'
+        FROM default__dev.weather_timeseries wt
+        JOIN weather_data.locations l ON l.id = wt.location_id
+        WHERE wt.observation_timestamp_utc = '{selected_run}'
+          AND wt.forecast_timestamp_utc = '{selected_time}'
     """).fetch_arrow_table()
     return (weather_arrow,)
 
@@ -245,26 +245,23 @@ def _(conn, get_clicked_hex, mo, selected_run):
     # Fetch time series data for clicked location
     timeseries_df = conn.execute(f"""
         SELECT
-            bw.forecast_timestamp_utc,
-            bw.observation_timestamp_utc,
-            bw.temperature_celsius,
-            bw.feels_like_celsius,
-            bw.wind_speed_mps,
-            bw.wind_direction_degrees,
-            bw.humidity_percent,
-            bw.cloud_cover_percent,
+            wt.forecast_timestamp_utc,
+            wt.observation_timestamp_utc,
+            wt.temperature_celsius,
+            wt.feels_like_celsius,
+            wt.wind_speed_mps,
+            wt.wind_direction_degrees,
+            wt.humidity_percent,
+            wt.cloud_cover_percent,
             l.name as location_name,
             l.lat,
             l.lon,
-            CASE
-                WHEN bw.forecast_timestamp_utc <= '{selected_run}' THEN 'Historical'
-                ELSE 'Forecast'
-            END as data_type
-        FROM default__dev.silver_weather bw
-        JOIN weather_data.locations l ON l.id = bw.location_id
-        WHERE bw.observation_timestamp_utc = '{selected_run}'
+            wt.data_type
+        FROM default__dev.weather_timeseries wt
+        JOIN weather_data.locations l ON l.id = wt.location_id
+        WHERE wt.observation_timestamp_utc = '{selected_run}'
           AND h3_latlng_to_cell(l.lat, l.lon, 9) = '{selected_hex}'
-        ORDER BY bw.forecast_timestamp_utc
+        ORDER BY wt.forecast_timestamp_utc
     """).df()
     return (timeseries_df,)
 
@@ -407,7 +404,7 @@ def _(combined_chart, mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(df, mo):
     # Additional statistics table
     location_name = df["location_name"].iloc[0] if len(df) > 0 else "Unknown"
