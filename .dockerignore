@@ -12,3 +12,4 @@
 **/sqlmesh/.cache
 **/sqlmesh/logs
 **/dagster_home
+**/__marimo__
