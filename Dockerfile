@@ -15,7 +15,7 @@ COPY workspace/dg-workspace /app
 
 # Install dependencies using uv (includes dagster CLI with webserver and daemon)
 RUN uv pip install --system -e . && \
-    uv pip install --system dagster-webserver pytest
+    uv pip install --system dagster-webserver dagster-dg-cli
 
 # Copy SQLMesh models
 COPY workspace/sqlmesh /app/sqlmesh
