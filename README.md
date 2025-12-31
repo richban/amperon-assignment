@@ -118,7 +118,7 @@ This project implements a **real-time weather data pipeline** that ingests hourl
 
 ### 1. DLT (Data Load Tool) - Ingestion
 
-**Purpose**: Extract weather data from Tomorrow.io API and load into DuckDB. Each run creates new snapshot with observation_timestamp
+**Purpose**: Extract weather data from Tomorrow.io API and load into DuckDB. Each run creates new snapshot with `observation_timestamp`
 
 **Why DLT?**
 - ✅ **Schema evolution**: Automatic schema detection and migration
@@ -151,7 +151,7 @@ This project implements a **real-time weather data pipeline** that ingests hourl
 
 **Why SQLMesh?**
 - ✅ **Declarative**: Models defined in SQL, not code
-- ✅ **Incremental strategies**: FULL, INCREMENTAL_BY_TIME_RANGE, INCREMENTAL_BY_UNIQUE_KEY
+- ✅ **Incremental strategies**: `FULL`, `INCREMENTAL_BY_TIME_RANGE`, `INCREMENTAL_BY_UNIQUE_KEY`
 - ✅ **Virtual environments**: Test changes without affecting production
 - ✅ **Built-in audits**: Data quality checks as first-class citizens
 - ✅ **Version control**: Change detection and automatic migration
@@ -160,9 +160,9 @@ This project implements a **real-time weather data pipeline** that ingests hourl
 
 | Model | Strategy | Rationale |
 |-------|----------|-----------|
-| `silver_weather` | INCREMENTAL_BY_TIME_RANGE | Append-only fact table, partitioned by observation_timestamp |
-| `weather_current` | INCREMENTAL_BY_UNIQUE_KEY | Snapshot (1 row per location), upsert by location_id |
-| `weather_timeseries` | FULL | Sliding window (144h), rebuilt hourly to ensure freshness |
+| `silver_weather` | `INCREMENTAL_BY_TIME_RANGE` | Append-only fact table, partitioned by observation_timestamp |
+| `weather_current` | `INCREMENTAL_BY_UNIQUE_KEY` | Snapshot (1 row per location), upsert by location_id |
+| `weather_timeseries` | `FULL` | Sliding window (144h), rebuilt hourly to ensure freshness |
 
 
 ### 4. DuckDB - Storage & Analytics
@@ -259,7 +259,7 @@ observation_timestamp    start_time              temperature
 - DLT metadata preservation
 
 **Grain**: `(location_id, forecast_timestamp_utc, observation_timestamp_utc)`
-**Idempotency**: INCREMENTAL_BY_TIME_RANGE (partitioned by observation_timestamp_utc)
+**Idempotency**: `INCREMENTAL_BY_TIME_RANGE` (partitioned by observation_timestamp_utc)
 **Cardinality**: Same as bronze (~1,450 rows per hour, append-only)
 
 **Key Columns**:
@@ -293,12 +293,10 @@ WHERE observation_timestamp_utc = latest_observation.latest_obs_time
 ```
 
 **Grain**: `location_id`
-**Idempotency**: INCREMENTAL_BY_UNIQUE_KEY (upsert on location_id)
+**Idempotency**: `INCREMENTAL_BY_UNIQUE_KEY` (upsert on location_id)
 **Cardinality**: **10 rows** (1 per location)
 **Refresh**: Every hour (replaces existing rows)
 
-
----
 
 #### `weather_timeseries`
 **Purpose**: **Sliding 144-hour window** of forecasts per location.
@@ -320,7 +318,7 @@ ORDER BY location_id, forecast_timestamp_utc
 ```
 
 **Grain**: `(location_id, forecast_timestamp_utc)`
-**Idempotency**: FULL refresh (rebuilds entire table every hour)
+**Idempotency**: `FULL` refresh (rebuilds entire table every hour)
 **Cardinality**: **1,440 rows** (10 locations × 144 hours)
 **Refresh**: Every hour (complete rebuild)
 
@@ -333,10 +331,11 @@ ORDER BY location_id, forecast_timestamp_utc
 ## Installation
 
 ### Prerequisites
+
 - Python 3.11+
 - [uv](https://github.com/astral-sh/uv) (recommended) or pip
 - Docker & Docker Compose (optional, for containerized deployment)
-
+- [Tomorrow IO API KEY](https://app.tomorrow.io/development/keys)
 
 
 ### Docker Deployment
@@ -374,6 +373,8 @@ docker-compose up -d
 # Navigate to: Lineage → Materialzie All (Latest)
 ```
 
+![/DAG](./docs/img/dag.png)
+
 ### 2. Materialization via CLI
 
 ```bash
@@ -390,6 +391,13 @@ docker-compose up marimo -d
 # Open browser
 open http://localhost:2718
 ```
+#### `notebooks/weather_observations.py` query data assets from marimo notebook
+
+![/MARIMO_VIZ](./docs/img/assignment_viz.png)
+
+#### `notebooks/weather_viz.py` interactive map visualization
+
+![/MARIMO_VIZ](./docs/img/marimo.png)
 
 ## Scale Considerations
 

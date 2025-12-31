@@ -127,6 +127,17 @@ dg dev
 dg launch --assets "*" --partition-key "2025-12-30-12:00"
 ```
 
+## Visualization
+
+```bash
+cd workspace/dg-workspace/src &&  marimo edit notebooks/weather_viz.py
+
+# Open http://localhost:2718
+```
+
+![/MARIMO_VIZ](../../docs/img/marimo.png)
+
+
 ## Testing
 
 ### Unit Tests
