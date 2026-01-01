@@ -13,7 +13,8 @@ RUN pip install uv
 COPY workspace/dg-workspace /app
 COPY workspace/sqlmesh /app/sqlmesh
 
-RUN uv pip install --system -e .
+RUN uv pip install --system -e . && \
+    uv pip install --system dagster-webserver dagster-dg-cli
 
 RUN mkdir -p /app/data
 

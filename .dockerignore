@@ -6,10 +6,11 @@
 **/.pytest_cache
 **/.git
 **/.DS_Store
-**/.env
+**/.env.example
 **/.envrc
 **/data
 **/sqlmesh/.cache
 **/sqlmesh/logs
 **/dagster_home
 **/__marimo__
+**/*.md
