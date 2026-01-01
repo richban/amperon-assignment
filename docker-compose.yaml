@@ -18,7 +18,6 @@ services:
       ENVIRONMENT: dev
 
       # Tomorrow.io API
-      TOMORROW_API_KEY: ${TOMORROW_API_KEY}
       SOURCES__TOMORROW_IO_PIPELINE__TOMORROW_IO_ACCESS_TOKEN: ${TOMORROW_API_KEY}
 
       # Dagster
