@@ -332,71 +332,153 @@ ORDER BY location_id, forecast_timestamp_utc
 
 ### Prerequisites
 
-- Python 3.11+
-- [uv](https://github.com/astral-sh/uv) (recommended) or pip
-- Docker & Docker Compose (optional, for containerized deployment)
-- [Tomorrow IO API KEY](https://app.tomorrow.io/development/keys)
+- Docker & Docker Compose
+- [Tomorrow.io API Key](https://app.tomorrow.io/development/keys) (sign up for free account)
 
+### Setup
 
-### Docker Deployment
+#### 1. Configure Environment
+
+Create a `.env` file in the project root with your Tomorrow.io API key:
 
 ```bash
-# 1. Configure environment
-cd workspace/dg-workspace
-cp .env.example .env
-# Edit .env and add TOMORROW_API_KEY and SOURCES__TOMORROW_IO_PIPELINE__TOMORROW_IO_ACCESS_TOKEN
-source .env
+# Create .env file in project root
+cd workspace/dg-workspace && cat > .env << EOF
+SOURCES__TOMORROW_IO_PIPELINE__TOMORROW_IO_ACCESS_TOKEN=your_api_key_here
+EOF
+```
 
-# 2. Start services
+> **Note**: .env.example - replace `your_api_key_here` with your actual Tomorrow.io API key from https://app.tomorrow.io/development/keys
+
+#### 2. Start Services
+
+```bash
+# Build and start Dagster container
 docker-compose up -d
+```
 
-# 3. Access services
-# Dagster UI: http://localhost:3000
+#### 3. Access Dagster UI
 
-# 4. Run pipeline manually via Web Console
-# Open http://localhost:3000
+Open http://localhost:3000 in your browser.
 
-# 5. Or materialize all assets via dagster cli
-docker-compose exec dagster dagster asset materialize -m dg_amperon.definitions --select '*'
+You should see the Dagster web interface with the asset catalog and lineage graph.
+
+#### 4. Materialize Assets
+
+**Option A: Via Web UI (Recommended)**
+
+The web UI provides immediate visual feedback and shows execution progress in real-time.
+
+1. Navigate to **Assets** → **View all assets**
+2. Click **Materialize all** button
+3. In the materialization dialog:
+   - Select **Latest** partition (materializes most recent hourly data)
+   - Click **Materialize**
+4. Watch the run progress in real-time (green = success, red = failure)
+5. Wait for all assets to show green checkmarks (~2-3 minutes for initial run)
+
+**Option B: Via CLI**
+
+```bash
+# Materialize all assets (latest partition)
+docker-compose exec dagster dagster asset materialize \
+  -m dg_amperon.definitions \
+  --select '*'
+```
+
+#### 5. View Interactive Visualization
+
+Once assets are materialized, explore the interactive weather dashboard:
+
+```bash
+# Start Marimo dashboard (interactive map + charts)
+docker exec -it amperon-dagster-1 \
+  marimo edit \
+  --host 0.0.0.0 \
+  --port 8000 \
+  --no-token \
+  --no-skew-protection \
+  /app/src/notebooks/weather_viz.py
+```
+
+Open http://localhost:8000 to see the GPU-accelerated H3 hexagon map with time slider.
+
+
+### Data Persistence
+
+The `./data` directory contains all persistent state:
+- `weather.db`: DuckDB database with all weather data
+- `dagster_home/`: Dagster run history and metadata
+- `dlt/`: DLT pipeline state and schema evolution tracking
+
+**Stopping and restarting containers preserves all data**:
+```bash
+docker-compose down  # Stop containers (data persists)
+docker-compose up -d # Restart containers (data still available)
+```
+
+**To reset and start fresh**:
+```bash
+docker-compose down
+rm -rf data/        # ⚠️ Deletes all data
+docker-compose up -d
 ```
 
 ## Usage
 
-### 1. Start Dagster Web Server
+### Asset Lineage Graph
 
-```bash
-# via docker-compose
-docker-compose up -d
-
-# In browser (http://localhost:3000):
-# Navigate to: Lineage → Materialzie All (Latest)
-```
+The Dagster UI provides a visual representation of the data pipeline dependencies:
 
 ![/DAG](./docs/img/dag.png)
 
-### 2. Materialization via CLI
+
+To backfill or re-process a specific hourly partition use the Dagster UI:
+
+1. Navigate to **Assets** → **weather_data/weather_observations**
+2. Click **Partitions** tab
+3. Select specific partition from grid
+4. Click **Materialize**
+
+
+#### Query Data Directly in Notebooks
+
+**Weather Observations Analysis** (`notebooks/weather_observations.py`):
+
+Query and analyze weather data using Marimo's reactive notebook:
 
 ```bash
-# via docker-compose
-docker-compose exec dagster dagster asset materialize -m dg_amperon.definitions --select '*' --partition-key "2024-01-14"
+docker exec -it amperon-dagster-1 \
+  marimo edit \
+  --host 0.0.0.0 \
+  --port 8000 \
+  --no-token \
+  /app/src/notebooks/weather_observations.py
 ```
-
-### 3. View Visualization and Query Data from Notebook
-
-```bash
-# Start Marimo dashboard
-docker exec -it amperon-dagster-1 marimo edit --host 0.0.0.0 --port 8000 --no-token --no-skew-protection /app/src/notebooks/weather_viz.py
-
-# Open browser
-open http://localhost:2718
-```
-#### `notebooks/weather_observations.py` query data assets from marimo notebook
 
 ![/MARIMO_VIZ](./docs/img/assignment_viz.png)
 
-#### `notebooks/weather_viz.py` interactive map visualization
+**Interactive Map Visualization** (`notebooks/weather_viz.py`):
+
+GPU-accelerated H3 hexagon map with time-based filtering:
+
+```bash
+docker exec -it amperon-dagster-1 \
+  marimo edit \
+  --host 0.0.0.0 \
+  --port 8000 \
+  --no-token \
+  --no-skew-protection \
+  /app/src/notebooks/weather_viz.py
+```
 
 ![/MARIMO_VIZ](./docs/img/marimo.png)
+
+**Features**:
+- Time slider to explore 144-hour forecast window
+- Interactive H3 hexagon grid visualization
+- Temperature and wind speed overlays
+- Location-specific drill-down
 
 ## Scale Considerations
 
@@ -459,7 +541,7 @@ open http://localhost:2718
 
 ## Project Structure
 
-```
+```bash
 amperon/
 ├── README.md                              ← This file (top-level overview)
 ├── ASSIGNMENT.md                          ← Original take-home instructions
