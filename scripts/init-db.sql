@@ -1,1 +1,0 @@
-SELECT 'world' as hello;
