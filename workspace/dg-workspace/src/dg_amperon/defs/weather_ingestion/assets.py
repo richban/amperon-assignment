@@ -118,7 +118,7 @@ def weather_observations_bronze_asset(
     yield from dlt.run(context=context, dlt_source=source)
 
 
-@asset_check(asset=AssetKey(["weather_data", "locations"]))
+@asset_check(asset=AssetKey(["weather_data", "locations"]), blocking=True)
 def check_locations_count(
     context: AssetCheckExecutionContext, duckdb_resource: DuckDBResource
 ) -> AssetCheckResult:

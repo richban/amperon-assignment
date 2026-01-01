@@ -2,12 +2,11 @@ from dagster import (
     AssetSelection,
     DefaultScheduleStatus,
     Definitions,
-    ScheduleDefinition,
     define_asset_job,
     load_assets_from_modules,
     load_asset_checks_from_modules,
     build_schedule_from_partitioned_job,
-    RunRequest,
+    in_process_executor,
 )
 from dagster_dlt import DagsterDltResource
 from dg_amperon.defs.weather_ingestion import assets
@@ -39,4 +38,5 @@ defs = Definitions(
         "dlt": DagsterDltResource(),
         "duckdb_resource": create_duckdb_resource(),
     },
+    executor=in_process_executor,
 )
