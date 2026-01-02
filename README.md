@@ -480,34 +480,9 @@ docker exec -it amperon-dagster-1 \
 - Temperature and wind speed overlays
 - Location-specific drill-down
 
-## Scale Considerations
+## Scaling
 
-#### Hypothetical Scenario: Scale to 1,000 Locations
-
-**Impact**:
-- **3.5M rows/day** (100x increase)
-- **200MB/day** compressed
-- **6GB/month**, **72GB/year**
-
-**Recommendation**: **TimescaleDB** (PostgreSQL extension)
-- **Automatic partitioning** by time (daily/weekly chunks)
-- **Compression** (10x+ compression ratios)
-- **Continuous aggregates** for real-time rollups
-- **Parallel query execution**
-- **Retention policies** for automatic data archiving
-
-**Alternatives**
-- **ClickHouse** (columnar OLAP)
-  - **1M+ rows/sec** write throughput
-  - **Columnar storage** (100x compression)
-  - **Distributed architecture** (sharding + replication)
-  - **Real-time aggregations** (materialized views)
-  - **TTL policies** for automatic data lifecycle
-- **InfluxDB** (time-series specific)
-  - **10M+ points/sec** write throughput
-  - **Built-in downsampling** (continuous queries)
-  - **Retention policies** with automatic rollup
-  - **Native time-series functions**
+For detailed information on architectural considerations and strategies for scaling to 1,000+ locations, see [SCALING_STRATEGY.md](SCALING_STRATEGY.md).
 
 
 ## Monitoring & Observability
@@ -580,13 +555,15 @@ amperon/
     └── weather_viz.py                     ← Marimo interactive dashboard
 ```
 
-## Future Enhancements
+## Future Enhancements & Production Roadmap
 
-1. **Alerting**: Slack/email notifications on pipeline failures
-2. **Data freshness sensors**: Auto-trigger downstream when upstream completes
-3. **Backfill automation**: Sensor-based gap detection and auto-backfill
-4. **Multi-region support**: Scale to 100+ locations globally
-5. **Forecast accuracy tracking**: Compare predictions vs. actuals
+> **MVP Note**: This project is currently configured as a local MVP. For production deployment, the Dagster control plane requires a dedicated persistent database (e.g., PostgreSQL) for run metadata and event logs.
+
+1. **Alerting**: Slack/email notifications on pipeline failures via Dagster sensors.
+2. **Data freshness sensors**: Auto-trigger downstream processing when upstream ingestion completes.
+3. **Backfill automation**: Sensor-based gap detection and automated partition backfilling.
+4. **Multi-region support**: Scale to 1,000+ locations globally.
+5. **Forecast accuracy tracking**: Implement historical snapshotting to compare predictions against observed actuals.
 
 ---
 
