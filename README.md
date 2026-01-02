@@ -482,7 +482,7 @@ docker exec -it amperon-dagster-1 \
 
 ## Scaling
 
-For detailed information on architectural considerations and strategies for scaling to 1,000+ locations, see [SCALING_STRATEGY.md](SCALING_STRATEGY.md).
+For detailed information on architectural considerations and strategies for scaling to 1,000+ locations, see [SCALING_STRATEGY.md](./docs/SCALING_STRATEGY.md).
 
 
 ## Monitoring & Observability
