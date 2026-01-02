@@ -1,0 +1,5 @@
+- **Idempotency & Upserts (`ON CONFLICT`)**: While TimescaleDB is often optimized for append-only workloads, it fully supports standard PostgreSQL **Upserts** (`INSERT ... ON CONFLICT DO UPDATE`). 
+    - **The Constraint**: In a Hypertable, the unique constraint/primary key *must* include the partitioning column (`observation_timestamp`). This aligns perfectly with our bitemporal model, where the unique key is `(location_id, start_time, observation_timestamp)`.
+    - **Reconciling with Compression**: TimescaleDB chunks become immutable (read-only) once compressed. 
+        - **Strategy**: We set the compression policy to trigger after 24-48 hours. This allows DLT's `merge` disposition to function normally for the "hot" window where updates and retries are most common. 
+        - **Historical Writes**: If we need to backfill data into a compressed period, we use a temporary staging table to decompress only the affected chunks, perform the merge, and re-compress.
