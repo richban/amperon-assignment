@@ -2,15 +2,13 @@ MODEL (
   name weather_timeseries,
   kind FULL,
   grain (location_id, forecast_timestamp_utc),
-  description 'Mart: Hourly weather timeseries per location (answers Q2) - sliding 144h window',
-  audits [
-    ASSERT_NOT_NULL(column_name := location_id),
-    ASSERT_NOT_NULL(column_name := forecast_timestamp_utc),
-    ASSERT_NOT_NULL(column_name := temperature_celsius),
-    ASSERT_NOT_NULL(column_name := wind_speed_mps)
-    -- assert_all_locations_present,
-    -- assert_timeseries_window_complete
-  ]
+   description 'Mart: Hourly weather timeseries per location (answers Q2) - sliding 144h window',
+   audits [
+     ASSERT_NOT_NULL(column_name := location_id),
+     ASSERT_NOT_NULL(column_name := forecast_timestamp_utc),
+     ASSERT_NOT_NULL(column_name := temperature_celsius),
+     ASSERT_NOT_NULL(column_name := wind_speed_mps)
+   ]
 );
 
 /*
