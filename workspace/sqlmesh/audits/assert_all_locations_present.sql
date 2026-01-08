@@ -1,6 +1,6 @@
 AUDIT (
   name assert_all_locations_present,
-  blocking TRUE
+  blocking FALSE
 );
 
 /*

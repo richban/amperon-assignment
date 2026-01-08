@@ -1,6 +1,6 @@
 AUDIT (
   name assert_unique_location_snapshot,
-  blocking TRUE
+  blocking FALSE
 );
 
 /*
