@@ -390,20 +390,147 @@ Even with schedule stopped, you can manually materialize partitions via the UI o
 
 ## Getting Started (Local Development)
 
+### Prerequisites
+
+- **Python 3.11+**: Required for type hints and async support
+- **uv**: Fast Python package manager (install via `pip install uv` or `brew install uv`)
+- **Nix** (optional): Development environment configuration via `direnv` or `nix develop`
+
 ### Installation
 
 The workspace requires Python 3.11+ and uses `uv` for dependency management. The environment is configured via `.env` file with database path and API credentials.
 
-**Initial setup**:
-1. Copy environment template and configure credentials
-2. Install Python dependencies (base + dev extras)
-3. Verify DuckDB database exists or will be created automatically
+**Step 1: Install the `dagster-dg-cli` CLI** (required before installing workspace dependencies):
+```bash
+uv pip install dagster-dg-cli
+```
+Without `dagster-dg-cli` installed globally, the workspace installation will fail because the project metadata requires the Dagster CLI tools.
 
-**Starting the webserver**:
-Run `dg dev` in this directory to start both the web UI and the scheduler daemon. The UI will be available at `http://localhost:3000`.
+**Step 2: Set up environment variables**:
 
-**First materialization**:
-Navigate to Assets → `weather_data/locations` → Materialize (no partition needed). This creates the location master table. Then materialize a single partition of `weather_data/weather_observations` to verify end-to-end flow.
+The workspace requires several environment variables to be set. You can configure them in three ways:
+
+**Option A: `.env` file** (recommended for local development):
+```bash
+# Copy the example environment file
+cp .env.example .env
+
+# Edit .env with your credentials and paths
+# Required variables (use absolute paths):
+# - SOURCES__TOMORROW_IO_PIPELINE__TOMORROW_IO_ACCESS_TOKEN: Your Tomorrow.io API key
+# - DUCKDB_DATABASE: Absolute path to DuckDB database (e.g., /path/to/data/weather.db)
+# - DAGSTER_HOME: Absolute path to Dagster home (e.g., /path/to/data/dagster_home)
+# - DLT_DATA_DIR: Absolute path to DLT data directory (e.g., /path/to/data/dlt)
+# - PYTHONPATH: Should include workspace src (e.g., /path/to/workspace/dg-workspace/src)
+```
+
+**Option B: `.envrc` file with direnv** (recommended for Nix development):
+
+If using `direnv` (auto-loads environment on `cd`), add these to your project's `.envrc`:
+```bash
+export DAGSTER_HOME="${PWD}/data/dagster_home"
+export PYTHONPATH="${PYTHONPATH}:${PWD}/workspace/dg-workspace/src"
+export DLT_DATA_DIR="${PWD}/data/dlt"
+export DUCKDB_DATABASE="${PWD}/data/weather.db"
+export SOURCES__TOMORROW_IO_PIPELINE__TOMORROW_IO_ACCESS_TOKEN="your-api-key-here"
+```
+
+Then run:
+```bash
+direnv allow
+```
+
+**Option C: Shell exports** (temporary, for current session only):
+```bash
+export DAGSTER_HOME="<project_root>/data/dagster_home"
+export PYTHONPATH="${PYTHONPATH}:<project_root>/workspace/dg-workspace/src"
+export DLT_DATA_DIR="<project_root>/data/dlt"
+export DUCKDB_DATABASE="<project_root>/data/weather.db"
+export SOURCES__TOMORROW_IO_PIPELINE__TOMORROW_IO_ACCESS_TOKEN="your-api-key"
+```
+
+**Why these variables matter**:
+- `DAGSTER_HOME`: Where Dagster stores schedule/run metadata (persistent across sessions)
+- `PYTHONPATH`: Ensures Python can import from workspace source directory
+- `DLT_DATA_DIR`: DLT pipeline state and configuration directory
+- `DUCKDB_DATABASE`: Absolute path to weather data database file
+- `SOURCES__TOMORROW_IO_PIPELINE__TOMORROW_IO_ACCESS_TOKEN`: API credentials for Tomorrow.io weather service
+
+**Step 3: Install workspace dependencies**:
+```bash
+# From this directory (workspace/dg-workspace/)
+uv pip install -e .              # Base dependencies
+uv pip install -e ".[dev]"       # Plus development extras (pytest, mypy, etc.)
+```
+
+**Step 4: Verify installation**:
+```bash
+# Check that dg CLI is available
+dg --version
+
+# Verify Python environment
+python --version  # Should be 3.11+
+
+# Run tests to confirm everything works
+pytest tests/
+```
+
+**Using Nix + direnv** (alternative to manual installation):
+
+If you have Nix and direnv installed:
+```bash
+# From the project root, allow direnv to manage the environment
+direnv allow
+
+# This automatically:
+# - Loads environment variables from .envrc
+# - Sets up DAGSTER_HOME, PYTHONPATH, DLT_DATA_DIR, etc.
+# - Activates the Python 3.11 development environment
+# - Runs on every cd into the directory
+```
+
+Or manually enter Nix shell:
+```bash
+nix develop
+```
+
+Then set environment variables manually (see Option C above).
+
+### Starting the Webserver
+
+Run `dg dev` in this directory to start both the web UI and the scheduler daemon:
+```bash
+cd workspace/dg-workspace
+dg dev
+```
+
+The UI will be available at `http://localhost:3000`.
+
+**What runs in the background**:
+- **Web server**: Dagster UI for asset monitoring, runs, and manual materialization
+- **Scheduler daemon**: Evaluates schedules and launches runs on cron intervals
+- **Execution environment**: Assets run in-process with sequential execution (DuckDB single-writer constraint)
+
+### First Materialization
+
+1. Open `http://localhost:3000` in your browser
+2. Navigate to **Assets** → `weather_data/locations` → Click "Materialize" button
+   - No partition needed (locations are static)
+   - This creates the location master table
+3. Navigate to **Assets** → `weather_data/weather_observations`
+4. Select a recent partition and click "Materialize"
+   - Verify API credentials are valid (check logs for any 401/403 errors)
+   - Observe the data flow: locations → observations → transformations
+
+**Troubleshooting first run**:
+- **"Module not found: dagster_dg"**: Run `uv pip install dagster-dg` first
+- **"Cannot find module in PYTHONPATH"**: Verify `PYTHONPATH` includes workspace src directory. Check with `echo $PYTHONPATH`
+- **"DAGSTER_HOME not set"**: Run one of the environment setup options (A, B, or C from Step 2)
+- **"DuckDB database not found"**: Ensure `DUCKDB_DATABASE` points to correct path, use absolute paths not relative
+- **"API key invalid"**: Check `.env` or environment variables have correct `TOMORROW_IO_API_KEY`
+- **"DuckDB lock error"**: Ensure only one `dg dev` process is running. Check with `ps aux | grep dg`
+- **"Empty database"**: DuckDB will auto-create on first write; check file permissions on data directory with `ls -la data/`
+- **direnv not auto-loading**: Run `eval "$(direnv hook bash)"` (or `zsh`) in your shell config, then `direnv allow` in project
 
 
 ## Workspace Structure
@@ -440,7 +567,9 @@ dg-workspace/
 │   ├── config.toml                       # DLT pipeline configuration
 │   └── secrets.toml                      # API credentials (gitignored)
 ├── .env.example                          # Environment variable template
+├── .env                                  # Local environment (generated, gitignored)
 ├── pyproject.toml                        # Dependencies (uv managed)
+├── flake.nix                             # Nix development environment (optional)
 └── README.md                             # This file
 ```
 
