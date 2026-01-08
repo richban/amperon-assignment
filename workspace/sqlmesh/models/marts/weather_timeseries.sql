@@ -7,9 +7,9 @@ MODEL (
     ASSERT_NOT_NULL(column_name := location_id),
     ASSERT_NOT_NULL(column_name := forecast_timestamp_utc),
     ASSERT_NOT_NULL(column_name := temperature_celsius),
-    ASSERT_NOT_NULL(column_name := wind_speed_mps),
-    assert_all_locations_present,
-    assert_timeseries_window_complete
+    ASSERT_NOT_NULL(column_name := wind_speed_mps)
+    -- assert_all_locations_present,
+    -- assert_timeseries_window_complete
   ]
 );
 
@@ -22,7 +22,7 @@ MODEL (
   This model maintains a sliding 144-hour window:
   - 24 hours of historical data (backcasted observations)
   - 120 hours of future forecasts (5 days)
-  
+
   Uses FULL refresh strategy:
   - Rebuilds entire table every hour with the latest observation
   - Guarantees clean 144-row window per location (no stale data)

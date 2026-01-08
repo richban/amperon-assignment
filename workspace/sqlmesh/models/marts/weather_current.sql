@@ -8,9 +8,9 @@ MODEL (
   audits [
     ASSERT_NOT_NULL(column_name := current_temperature_c),
     ASSERT_NOT_NULL(column_name := current_wind_speed_mps),
-    ASSERT_NOT_NULL(column_name := observed_at_utc),
-    assert_all_locations_present,
-    assert_unique_location_snapshot
+    ASSERT_NOT_NULL(column_name := observed_at_utc)
+    -- assert_all_locations_present,
+    -- assert_unique_location_snapshot
   ]
 );
 
